@@ -6,6 +6,14 @@
 
 PAS Assistant est un outil d'aide au remplissage de questionnaires de sécurité (Plans d'Assurance Sécurité) pour une ESN (FOURNISSEUR). L'outil parse un questionnaire sécurité (xlsx ou docx), pose des questions de cadrage, anonymise les données confidentielles, appelle l'API Claude pour pré-remplir les réponses, puis génère un document complété avec des points d'attention.
 
+### Méthode de développement — Baby Steps
+
+Le développement se fait par itérations successives appelées **baby steps** :
+
+1. **Un dossier par itération** — chaque itération vit dans un dossier `_vXX` à la racine du projet (ex : `_v01`, `_v02`, ...). Tout le code de l'itération est dans ce dossier.
+2. **Suivi des prompts** — chaque prompt de la conversation est sauvegardé sous `_vXX/_prompts/NN.md` (ex : `_v01/_prompts/01.md`, `_v01/_prompts/02.md`, ...).
+3. **Le dossier `_vXX`** à la racine sert de template vide (avec son sous-dossier `_prompts/`).
+
 ### Documents de référence
 
 Lis impérativement avant de commencer :

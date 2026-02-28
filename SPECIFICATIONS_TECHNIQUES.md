@@ -29,7 +29,7 @@
           │ tokens              │
           ▼                     ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│              Serveur DigitalOcean (DIGITAL_OCEAN_IP)               │
+│              Serveur DigitalOcean (165.232.65.179)               │
 │              Ubuntu 24.04 — appsec.cc                              │
 │                                                                    │
 │  ┌──────────────────────────────────────────────────────────┐     │
@@ -694,7 +694,7 @@ server {
 
 ```ini
 [pas_server]
-appsec.cc ansible_host=DIGITAL_OCEAN_IP ansible_user=root
+appsec.cc ansible_host=165.232.65.179 ansible_user=root
 ```
 
 ### 10.2 Playbook principal — `playbook.yml`

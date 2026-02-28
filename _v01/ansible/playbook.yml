@@ -1,0 +1,87 @@
+---
+- name: Setup Nginx + HTTPS + static web interface
+  hosts: all
+  become: true
+
+  vars:
+    domain: appsec.cc
+    web_root: /opt/pas-assistant/web
+    admin_email: admin@appsec.cc
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Nginx and Certbot
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Create web root directory
+      file:
+        path: "{{ web_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy static index.html
+      copy:
+        src: files/index.html
+        dest: "{{ web_root }}/index.html"
+        mode: "0644"
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: Deploy HTTP Nginx config (pre-certbot)
+      template:
+        src: templates/nginx-http.conf.j2
+        dest: /etc/nginx/sites-available/{{ domain }}
+        mode: "0644"
+      notify: reload nginx
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/{{ domain }}
+        dest: /etc/nginx/sites-enabled/{{ domain }}
+        state: link
+      notify: reload nginx
+
+    - name: Ensure Nginx is started
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Apply HTTP config before running certbot
+      meta: flush_handlers
+
+    - name: Obtain Let's Encrypt certificate
+      command: >-
+        certbot certonly --nginx
+        -d {{ domain }}
+        --non-interactive
+        --agree-tos
+        --email {{ admin_email }}
+      args:
+        creates: /etc/letsencrypt/live/{{ domain }}/fullchain.pem
+
+    - name: Deploy HTTPS Nginx config (post-certbot)
+      template:
+        src: templates/nginx-https.conf.j2
+        dest: /etc/nginx/sites-available/{{ domain }}
+        mode: "0644"
+      notify: reload nginx
+
+  handlers:
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
