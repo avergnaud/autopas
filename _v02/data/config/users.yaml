@@ -1,0 +1,9 @@
+# Utilisateurs autorisés à accéder à PAS Assistant
+# Identifiants : adresses email Azure AD / M365
+authorized_users:
+  - email: "a.vergnaud@fournisseur.com"
+    role: "admin"
+  - email: "jm.orsini@fournisseur.com"
+    role: "user"
+  - email: "f.morin@fournisseur.com"
+    role: "admin"

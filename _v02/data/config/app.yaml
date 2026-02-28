@@ -1,0 +1,43 @@
+# PAS Assistant — Configuration générale
+
+# API Claude
+claude:
+  api_key_env: "ANTHROPIC_API_KEY"
+  model: "claude-sonnet-4-6"
+  max_tokens: 16000
+  temperature: 0.3
+
+# Verbosité des réponses générées
+verbosity:
+  default_level: 2
+  levels:
+    1:
+      label: "Concis"
+      max_words: 50
+    2:
+      label: "Standard"
+      max_words: 100
+    3:
+      label: "Détaillé"
+      max_words: 150
+
+# Sélection des fichiers de référence dans le corpus
+reference:
+  max_files: 3
+
+# OAuth2 / Azure AD
+oauth2:
+  tenant_id_env: "AZURE_TENANT_ID"
+  client_id_env: "AZURE_CLIENT_ID"
+  client_secret_env: "AZURE_CLIENT_SECRET"
+
+# Bot Teams
+teams_bot:
+  app_id_env: "TEAMS_BOT_APP_ID"
+  app_password_env: "TEAMS_BOT_APP_PASSWORD"
+
+# Serveur
+server:
+  host: "127.0.0.1"
+  port: 8000
+  domain: "appsec.cc"
