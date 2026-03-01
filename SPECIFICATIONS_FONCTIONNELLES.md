@@ -213,8 +213,8 @@ Voici la liste par défaut des questions de cadrage :
 **F-CADRAGE-03 — Questions conditionnelles**
 Certaines questions ne sont posées que si une réponse précédente le justifie. Exemple : la question 2 n'est posée que si la réponse à la question 1 est "dispositif à engagement". Ce mécanisme de conditions doit être configurable dans le fichier de questions.
 
-**F-CADRAGE-04 — Interaction conversationnelle**
-Les questions sont posées une par une (ou par groupe logique) dans le chat Teams ou l'interface web. L'utilisateur répond en texte libre.
+**F-CADRAGE-04 — Interaction wizard**
+Les questions sont posées une par une dans l'interface web (wizard). L'utilisateur répond via le contrôle adapté au type de question (radio, checkbox, champ texte, champ numérique). Voir F-WEB-05 pour le détail UX.
 
 ### 6.3 Anonymisation
 
@@ -351,11 +351,73 @@ L'ajout au corpus de référence est automatique après correction. L'utilisateu
 
 ### 6.9 Interface Web
 
-**F-WEB-01 — Interface basique**
-Une interface web sur `appsec.cc` offre les mêmes fonctionnalités que le bot Teams : upload, questions de cadrage, téléchargement du résultat, ré-import de corrections.
+**F-WEB-01 — Interface wizard (étape par étape)**
+L'interface web sur `appsec.cc` guide l'utilisateur à travers le workflow complet via un wizard en plusieurs étapes séquentielles. Chaque étape correspond à une phase du traitement. La navigation se fait avec des boutons "Précédent" et "Suivant / Continuer".
+
+**Étapes du wizard :**
+
+| # | Étape | Déclencheur backend |
+|---|---|---|
+| 1 | **Upload** — Déposer le fichier questionnaire (.xlsx ou .docx) | `POST /api/projects` |
+| 2 | **Structure** — Confirmer la structure détectée par Claude (onglets, colonnes, pattern) | (résultat de l'upload) |
+| 3 | **Cadrage** — Répondre aux questions de cadrage une par une | `POST /api/projects/{id}/cadrage` |
+| 4 | **Anonymisation** — Saisir les paires mot réel → alias | `POST /api/projects/{id}/anonymize` |
+| 5 | **Génération** — Traitement en cours (polling) + téléchargement du résultat | `POST /api/projects/{id}/generate` + polling `GET /api/projects/{id}/status` |
 
 **F-WEB-02 — Authentification**
 L'accès est protégé par SSO via le tenant M365 du FOURNISSEUR (OAuth2).
+
+**F-WEB-03 — Étape Upload**
+- Zone de dépôt (drag & drop) acceptant .xlsx et .docx, taille max 50 Mo.
+- Un bouton "Parcourir" en complément.
+- Affichage du nom du fichier sélectionné avant envoi.
+- Bouton "Envoyer" — déclenche la création du projet et l'analyse de structure par Claude.
+- Indicateur de chargement pendant l'analyse de structure.
+
+**F-WEB-04 — Étape Structure (confirmation)**
+- Afficher un résumé de la structure détectée par Claude :
+  - Pour xlsx : nom de l'onglet, colonne ID, colonne question, colonne(s) réponse, ligne d'en-tête.
+  - Pour docx : pattern de structure, marqueur de zone de réponse.
+- L'utilisateur peut modifier les valeurs si la détection est incorrecte.
+- Un bouton "Valider la structure" permet de passer à l'étape suivante.
+
+**F-WEB-05 — Étape Cadrage (wizard question par question)**
+- Les questions sont chargées depuis le backend (`GET /api/projects/{id}/questions`).
+- Une seule question est affichée à la fois avec un numéro de progression (ex: "Question 3 / 9").
+- Rendu du champ selon le type déclaré dans `questions.txt` :
+  - `OPTIONS` (simple) : boutons radio ou menu déroulant.
+  - `OPTIONS` + `MULTI: true` : cases à cocher.
+  - `TYPE: number` : champ numérique.
+  - `TYPE: text` (défaut) : champ texte libre.
+- Les questions conditionnelles (`IF previous == "X"`) sont évaluées côté client : la question est affichée ou sautée selon la réponse précédente.
+- Le niveau de verbosité (1/2/3) est posé comme dernière question de cadrage.
+- Boutons "Précédent" et "Suivant". Sur la dernière question : bouton "Valider le cadrage".
+
+**F-WEB-06 — Étape Anonymisation**
+- Tableau de paires : colonne "Mot réel" / colonne "Alias anonymisé".
+- Alias anonymisés préremplis avec des suggestions (CLIENT, MARCHE, PERSONNE_1…).
+- Bouton "Ajouter une ligne" pour ajouter une nouvelle paire.
+- Bouton "✕" sur chaque ligne pour la supprimer.
+- Cette étape est optionnelle : un bouton "Passer cette étape" permet de continuer sans anonymisation.
+- Bouton "Lancer le traitement" déclenche l'anonymisation puis la génération.
+
+**F-WEB-07 — Étape Génération (traitement en cours)**
+- Message "Traitement en cours…" avec un indicateur de progression animé.
+- Détail des étapes affichées au fur et à mesure : "Anonymisation…", "Sélection des références…", "Génération des réponses…", "Points d'attention…", "Finalisation…".
+- Le frontend interroge `GET /api/projects/{id}/status` toutes les 3 secondes (polling).
+- Quand `status == "completed"` :
+  - Afficher un message de succès.
+  - Bouton de téléchargement du document rempli.
+  - Bouton de téléchargement des points d'attention (fichier Markdown).
+  - Bouton optionnel "Ré-importer un document corrigé" (boucle de correction).
+
+**F-WEB-08 — Gestion des erreurs**
+- Si une étape échoue (parse error, API Claude indisponible…), afficher un message d'erreur clair et un bouton "Réessayer".
+- Le projet reste dans son état intermédiaire sur le serveur : l'utilisateur peut reprendre depuis l'étape en cours.
+
+**F-WEB-09 — Reprise d'un projet existant**
+- La page privée liste les projets de l'utilisateur avec leur statut et leur date.
+- Un clic sur un projet en cours reprend le wizard à l'étape correspondante au statut actuel du projet.
 
 ### 6.11 Administration
 

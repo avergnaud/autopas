@@ -1,0 +1,491 @@
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #0078d4;
+  margin-right: auto;
+}
+
+.user-info {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* ── Main container ──────────────────────────────────────────────────────── */
+main {
+  max-width: 780px;
+  margin: 2rem auto;
+  padding: 0 1rem 3rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+p { color: #555; line-height: 1.55; margin-bottom: 0.75rem; }
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+.hint   { color: #888; font-size: 0.85rem; }
+.small  { font-size: 0.8rem; }
+.req    { color: #c00; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1.25rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary   { background: #0078d4; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #005fa3; }
+
+.btn-secondary { background: #e8e8e8; color: #333; }
+.btn-secondary:hover:not(:disabled) { background: #d5d5d5; }
+
+.btn-outline {
+  background: transparent;
+  color: #0078d4;
+  border: 1.5px solid #0078d4;
+}
+.btn-outline:hover:not(:disabled) { background: #e8f2fb; }
+
+.btn-ghost { background: transparent; color: #555; }
+.btn-ghost:hover { background: #f0f0f0; }
+
+.btn-small { padding: 0.35rem 0.8rem; font-size: 0.82rem; }
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+.btn-icon:hover { color: #c00; background: #fff0f0; }
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Section header (project list) ──────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Step header + indicator ─────────────────────────────────────────────── */
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.step-indicator .step {
+  padding: 0.2rem 0.55rem;
+  border-radius: 12px;
+  background: #e8e8e8;
+  color: #888;
+  font-weight: 500;
+}
+.step-indicator .step.active {
+  background: #0078d4;
+  color: #fff;
+}
+.step-indicator .step.done {
+  background: #d4edda;
+  color: #2a7a3f;
+}
+.step-indicator .step-sep { color: #bbb; }
+
+/* ── Wizard step ─────────────────────────────────────────────────────────── */
+.wizard-step {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.75rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+/* ── Project list ────────────────────────────────────────────────────────── */
+#view-projects {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.75rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+.project-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.project-card:hover { border-color: #0078d4; background: #f5f9ff; }
+
+.project-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.project-date { font-size: 0.8rem; color: #888; }
+.project-card-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.status-created          { background: #e8e8e8; color: #555; }
+.status-structure_detected { background: #dde9f7; color: #1a5fa0; }
+.status-cadrage          { background: #dde9f7; color: #1a5fa0; }
+.status-anonymizing      { background: #fff3cd; color: #856404; }
+.status-generating       { background: #fff3cd; color: #856404; }
+.status-completed        { background: #d4edda; color: #2a7a3f; }
+.status-error            { background: #f8d7da; color: #842029; }
+
+/* ── Upload zone ─────────────────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed #ccc;
+  border-radius: 10px;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: default;
+  transition: border-color 0.2s, background 0.2s;
+  margin: 1rem 0;
+}
+.upload-zone.drag-over {
+  border-color: #0078d4;
+  background: #f0f7ff;
+}
+.upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  background: #f0f7ff;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.selected-file::before { content: "📄"; }
+
+/* ── Loading box ─────────────────────────────────────────────────────────── */
+.loading-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: #f5f9ff;
+  border-radius: 8px;
+  margin: 0.75rem 0;
+  color: #333;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid #ddd;
+  border-top-color: #0078d4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.spinner.large { width: 40px; height: 40px; border-width: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error / success messages ─────────────────────────────────────────────── */
+.error-msg {
+  color: #842029;
+  background: #f8d7da;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  margin-top: 0.5rem;
+}
+
+.error-box {
+  color: #842029;
+  background: #f8d7da;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.success-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: #d4edda;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  color: #2a7a3f;
+  font-size: 1.05rem;
+}
+.success-icon {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* ── Structure form ──────────────────────────────────────────────────────── */
+.structure-sheet {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.sheet-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+.sheet-block-header h3 { font-size: 1rem; color: #444; margin: 0; }
+
+.btn-trash { font-size: 1rem; }
+.btn-trash:not(.disabled):hover { color: #c00; background: #fff0f0; }
+.btn-trash.disabled { opacity: 0.3; cursor: not-allowed; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0.55rem 1rem;
+  align-items: center;
+}
+.form-grid label { font-size: 0.88rem; color: #555; }
+.form-grid input[type="text"],
+.form-grid input[type="number"] {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 0.88rem;
+  width: 100%;
+}
+.form-grid input[type="checkbox"] { width: 16px; height: 16px; }
+
+/* ── Cadrage question card ───────────────────────────────────────────────── */
+.q-progress {
+  font-size: 0.82rem;
+  color: #888;
+  margin-bottom: 0.75rem;
+}
+
+.question-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 0.5rem;
+  background: #fafafa;
+}
+
+.q-text {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #1a1a2e;
+  margin-bottom: 1.1rem;
+  line-height: 1.5;
+}
+
+.q-input { display: flex; flex-direction: column; gap: 0.55rem; }
+
+.choice-label {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  border: 1.5px solid #ddd;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 0.92rem;
+}
+.choice-label:hover { border-color: #0078d4; background: #f5f9ff; }
+.choice-label input { width: 16px; height: 16px; flex-shrink: 0; }
+.choice-label input:checked + span { color: #0078d4; font-weight: 500; }
+
+.text-input {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid #ccc;
+  border-radius: 7px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+.text-input:focus { outline: none; border-color: #0078d4; }
+
+/* ── Anonymisation table ─────────────────────────────────────────────────── */
+.anon-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+.anon-table th {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  background: #f5f5f5;
+  border-bottom: 2px solid #e0e0e0;
+  font-size: 0.82rem;
+  color: #555;
+}
+.anon-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; }
+.anon-table input[type="text"] {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 0.88rem;
+}
+.anon-table input[type="text"]:focus { outline: none; border-color: #0078d4; }
+
+/* ── Generation progress ─────────────────────────────────────────────────── */
+#gen-in-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 0;
+}
+
+.gen-step { font-size: 0.95rem; color: #555; }
+
+.progress-track {
+  width: 100%;
+  max-width: 400px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: #0078d4;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* ── Pipeline steps ──────────────────────────────────────────────────────── */
+.pipeline-steps {
+  list-style: none;
+  width: 100%;
+  max-width: 360px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-self: flex-start;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 5px;
+}
+
+.step-icon {
+  width: 1.2rem;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.pipeline-step.done {
+  color: #2a7a3f;
+}
+.pipeline-step.done .step-icon { color: #2a7a3f; font-weight: 700; }
+
+.pipeline-step.active {
+  color: #0078d4;
+  font-weight: 600;
+  background: #f0f7ff;
+}
+
+.pipeline-step.pending {
+  color: #aaa;
+}
+
+/* Tiny inline spinner for the active pipeline step */
+.spinner-sm {
+  display: inline-block;
+  width: 13px; height: 13px;
+  border: 2px solid #cce0f5;
+  border-top-color: #0078d4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+/* ── Download grid ───────────────────────────────────────────────────────── */
+.download-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@media (max-width: 540px) { .download-grid { grid-template-columns: 1fr; } }

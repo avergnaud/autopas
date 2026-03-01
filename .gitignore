@@ -1,0 +1,32 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# .env.example IS committed; .env (with real secrets) is NOT.
+.env
+!.env.example
+
+# ── Runtime project data (generated per-user, not for version control) ────────
+data/projects/
+
+# ── OS / editors ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ── Pytest / coverage ─────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/

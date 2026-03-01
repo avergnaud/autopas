@@ -284,16 +284,100 @@ authorized_users:
 | GET | `/api/auth/login` | Initie le flow OAuth2 (redirect vers Azure AD) |
 | GET | `/api/auth/callback` | Callback OAuth2 |
 | GET | `/api/auth/me` | Retourne l'utilisateur courant |
-| POST | `/api/projects` | Crée un nouveau projet (upload questionnaire) |
+| POST | `/api/projects` | Crée un nouveau projet (upload questionnaire + analyse structure) |
 | GET | `/api/projects` | Liste les projets de l'utilisateur |
 | GET | `/api/projects/{id}` | Détail d'un projet |
+| PUT | `/api/projects/{id}/structure` | Valide / corrige la structure détectée |
+| GET | `/api/projects/{id}/questions` | Retourne la liste des questions de cadrage |
 | POST | `/api/projects/{id}/cadrage` | Envoie les réponses de cadrage |
-| POST | `/api/projects/{id}/anonymize` | Envoie les mots-clés à anonymiser |
-| POST | `/api/projects/{id}/generate` | Lance la génération (appel API Claude) |
-| GET | `/api/projects/{id}/status` | Statut du traitement (polling) |
+| POST | `/api/projects/{id}/anonymize` | Envoie les paires d'anonymisation (ou liste vide si étape passée) |
+| POST | `/api/projects/{id}/generate` | Lance la génération en arrière-plan |
+| GET | `/api/projects/{id}/status` | Statut du traitement (polling, toutes les 3s) |
 | GET | `/api/projects/{id}/output` | Télécharge le document rempli |
-| GET | `/api/projects/{id}/attention` | Télécharge les points d'attention |
-| POST | `/api/projects/{id}/corrections` | Upload du document corrigé |
+| GET | `/api/projects/{id}/attention` | Télécharge le fichier points d'attention (.md) |
+| POST | `/api/projects/{id}/corrections` | Upload du document corrigé (boucle correction) |
+
+**Réponse de `POST /api/projects` (upload + analyse structure) :**
+```json
+{
+  "id": "proj_20260301_143022_abc12",
+  "status": "structure_detected",
+  "original_filename": "Questionnaire_SSI.xlsx",
+  "format": "xlsx",
+  "structure": {
+    "sheets": [
+      {
+        "name": "3 - Questionnaire",
+        "has_questions": true,
+        "id_column": "B",
+        "question_column": "D",
+        "response_columns": ["E", "G"],
+        "header_row": 3,
+        "first_data_row": 4
+      }
+    ]
+  }
+}
+```
+
+**Réponse de `GET /api/projects/{id}/status` (polling) :**
+```json
+{
+  "id": "proj_20260301_143022_abc12",
+  "status": "generating",
+  "progress_step": "Génération des réponses...",
+  "progress_pct": 60
+}
+```
+
+Valeurs possibles de `status` : `created`, `structure_detected`, `cadrage`, `anonymizing`, `generating`, `completed`, `error`.
+
+Valeurs possibles de `progress_step` (quand `status == "generating"`) :
+- `"Anonymisation en cours..."`
+- `"Sélection des fichiers de référence..."`
+- `"Génération des réponses (appel Claude)..."`
+- `"Génération des points d'attention..."`
+- `"Finalisation du document..."`
+
+**Réponse de `GET /api/projects/{id}/questions` :**
+```json
+{
+  "questions": [
+    {
+      "id": 1,
+      "text": "Est-ce que l'Appel d'Offre porte sur de l'Assistance Technique ou un dispositif à engagement ?",
+      "type": "options",
+      "options": ["Assistance Technique", "Dispositif à engagement"],
+      "multi": false,
+      "condition": null
+    },
+    {
+      "id": 2,
+      "text": "Si l'Appel d'Offre porte sur un dispositif à engagement, est-ce un CDR, CDC, CDS ?",
+      "type": "options",
+      "options": ["CDR", "CDC", "CDS"],
+      "multi": false,
+      "condition": {"question_id": 1, "equals": "Dispositif à engagement"}
+    },
+    {
+      "id": 3,
+      "text": "Combien d'Equivalents Temps Plein sont mobilisés au début de la Prestation ?",
+      "type": "number",
+      "options": null,
+      "multi": false,
+      "condition": null
+    }
+  ],
+  "verbosity_question": {
+    "id": 99,
+    "text": "Quel niveau de détail souhaitez-vous pour les réponses ?",
+    "type": "options",
+    "options": ["Concis (50 mots max)", "Standard (100 mots max)", "Détaillé (150 mots max)"],
+    "multi": false,
+    "condition": null
+  }
+}
+```
 
 ### 4.3 Administration
 
@@ -305,6 +389,74 @@ authorized_users:
 | PUT | `/api/admin/corpus/{ref_id}/metadata` | Modifie les métadonnées |
 | GET | `/api/admin/config` | Lecture configuration |
 | PUT | `/api/admin/config` | Mise à jour configuration |
+
+---
+
+## 4bis. Interface Web — Architecture Frontend
+
+### Frontend — Technologie
+
+**HTML/CSS/JS vanilla** (pas de framework, pas de build step).
+
+Trois fichiers statiques servis par Nginx depuis `/opt/pas-assistant/web/` :
+- `index.html` — page publique (accueil + bouton login)
+- `private.html` — application wizard (accessible après authentification)
+- `style.css` — feuille de styles commune
+- `app.js` — logique wizard (inclus dans `private.html`)
+
+### Frontend — Structure du wizard
+
+Le wizard est géré entièrement côté client dans `app.js`. Un objet `state` central contient l'étape courante, l'ID de projet, et les données collectées.
+
+```
+state = {
+  step: "upload" | "structure" | "cadrage" | "anonymisation" | "generation",
+  projectId: null,
+  structure: null,
+  questions: [],
+  questionIndex: 0,
+  answers: {},
+  anonymMappings: [],
+  verbosityLevel: 2
+}
+```
+
+Chaque étape est une `<section>` HTML masquée par défaut (`display: none`). Le wizard affiche la section correspondant à `state.step`.
+
+### Frontend — Gestion des conditions (questions de cadrage)
+
+Les conditions sont évaluées côté client lors de la navigation dans le wizard :
+
+```javascript
+function isQuestionVisible(question, answers) {
+  if (!question.condition) return true;
+  const previousAnswer = answers[question.condition.question_id];
+  return previousAnswer === question.condition.equals;
+}
+```
+
+Les questions non visibles sont sautées automatiquement (le wizard passe à la question suivante sans les afficher et sans les inclure dans les réponses envoyées au backend).
+
+### Frontend — Polling de statut
+
+Pendant l'étape de génération, un timer interroge le backend toutes les 3 secondes :
+
+```javascript
+async function pollStatus(projectId) {
+  const res = await fetch(`/api/projects/${projectId}/status`);
+  const data = await res.json();
+  updateProgressUI(data.progress_step, data.progress_pct);
+  if (data.status === "completed") {
+    showDownloadButtons(projectId);
+    return;
+  }
+  if (data.status === "error") {
+    showErrorMessage();
+    return;
+  }
+  setTimeout(() => pollStatus(projectId), 3000);
+}
+```
 
 ---
 
