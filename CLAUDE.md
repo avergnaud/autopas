@@ -25,7 +25,6 @@ Lis impérativement avant de commencer :
 - **Serveur** : Ubuntu 24.04 sur DigitalOcean (2 GB RAM, 1 CPU)
 - **Backend** : Python 3.12 + FastAPI + Uvicorn
 - **Reverse proxy** : Nginx + Let's Encrypt (domaine : appsec.cc)
-- **Bot Teams** : Bot Framework SDK Python (botbuilder-python)
 - **LLM** : API Claude (SDK `anthropic`)
 - **Parsing** : `openpyxl` (xlsx), `python-docx` (docx)
 - **Auth** : OAuth2 via Azure AD / M365 (librairie `msal`)
@@ -66,8 +65,6 @@ Lis impérativement avant de commencer :
 
 4. **Un seul utilisateur à la fois** par questionnaire. Pas besoin de concurrence.
 
-5. **Pas d'intelligence dans le bot Teams** — Le bot est un proxy pur qui transmet les messages entre Teams et le backend FastAPI. Toute la logique est côté backend.
-
 ### Ordre de développement recommandé
 
 #### Phase 1 — Fondations
@@ -94,18 +91,13 @@ Lis impérativement avant de commencer :
 #### Phase 4 — API REST
 16. `api/web.py` — tous les endpoints interface web (CRUD projets, upload, download, cadrage, génération)
 17. `api/admin.py` — endpoints administration corpus
-18. `api/bot.py` — endpoint Bot Framework
 
 #### Phase 5 — Interface web
-19. `web/index.html`, `web/app.js`, `web/style.css` — interface web basique (upload, cadrage, résultats)
+18. `web/index.html`, `web/app.js`, `web/style.css` — interface web basique (upload, cadrage, résultats)
 
-#### Phase 6 — Bot Teams
-20. Intégration Bot Framework SDK dans le backend
-21. Gestion upload/download fichiers via Teams
-
-#### Phase 7 — Infrastructure
-22. Playbook Ansible complet (roles: base, nginx, app)
-23. Templates Nginx, systemd, config
+#### Phase 6 — Infrastructure
+19. Playbook Ansible complet (roles: base, nginx, app)
+20. Templates Nginx, systemd, config
 
 ### Conventions de code
 
@@ -129,12 +121,6 @@ Trier les mots-clés à anonymiser par longueur décroissante pour éviter les r
 #### Appel API Claude — Taille du contexte
 Un questionnaire complet + fichiers de référence peut représenter beaucoup de tokens. Vérifier que la taille totale ne dépasse pas la fenêtre de contexte du modèle. Si c'est le cas, réduire le nombre de fichiers de référence ou envoyer les questions par lots.
 
-#### Bot Teams — Upload de fichiers
-Les fichiers uploadés dans Teams sont accessibles via une URL temporaire. Le bot doit télécharger le fichier depuis cette URL avant de le transmettre au backend.
-
-#### Bot Teams — Messages longs
-Teams a une limite de taille sur les messages. Pour les points d'attention longs, envoyer en pièce jointe plutôt qu'en texte dans le chat.
-
 ### Fichiers de test
 
 Le projet contient des exemples de questionnaires déjà anonymisés dans le corpus :
@@ -151,8 +137,6 @@ ANTHROPIC_API_KEY          # Clé API Anthropic
 AZURE_TENANT_ID            # ID du tenant M365 (TENANT_365)
 AZURE_CLIENT_ID            # ID de l'app registration Azure AD
 AZURE_CLIENT_SECRET        # Secret de l'app registration
-TEAMS_BOT_APP_ID           # ID de l'app bot Teams
-TEAMS_BOT_APP_PASSWORD     # Password de l'app bot Teams
 ```
 
 ### Commandes utiles

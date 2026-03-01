@@ -14,20 +14,20 @@
 ┌────────────────────────────────────────────────────────────────────┐
 │                        TENANT_365 (M365)                           │
 │                                                                    │
-│  ┌──────────────┐    ┌───────────────────┐                        │
-│  │  Utilisateur  │    │  Azure Bot Service │                       │
-│  │  (Teams)      │───▶│  (Bot Channel      │                       │
-│  └──────────────┘    │   Registration)    │                        │
-│                      └────────┬──────────┘                         │
-│  ┌──────────────┐             │                                    │
-│  │  Azure AD     │             │   Webhooks HTTPS                   │
-│  │  (OAuth2 /    │             │                                    │
-│  │   SSO)        │             │                                    │
-│  └──────┬───────┘             │                                    │
-└─────────┼─────────────────────┼────────────────────────────────────┘
-          │ OAuth2              │
-          │ tokens              │
-          ▼                     ▼
+│  ┌──────────────┐                                                  │
+│  │  Utilisateur  │                                                  │
+│  │  (Navigateur) │                                                  │
+│  └──────────────┘                                                  │
+│                                                                    │
+│  ┌──────────────┐                                                  │
+│  │  Azure AD     │                                                  │
+│  │  (OAuth2 /    │                                                  │
+│  │   SSO)        │                                                  │
+│  └──────┬───────┘                                                  │
+└─────────┼──────────────────────────────────────────────────────────┘
+          │ OAuth2
+          │ tokens
+          ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │              Serveur DigitalOcean (165.232.65.179)               │
 │              Ubuntu 24.04 — appsec.cc                              │
@@ -65,8 +65,7 @@
 | Reverse proxy | Nginx | HTTPS, routage, fichiers statiques |
 | Certificat SSL | Let's Encrypt (Certbot) | HTTPS pour appsec.cc |
 | Backend | Python 3.12 + FastAPI + Uvicorn | API REST, logique métier |
-| Bot Teams | Azure Bot Service (Bot Channel Registration) | Relay vers le backend |
-| Interface Web | HTML/CSS/JS statique (vanilla ou Vue.js léger) | UI alternative |
+| Interface Web | HTML/CSS/JS statique (vanilla ou Vue.js léger) | Frontend utilisateur |
 | Authentification | OAuth2 / Azure AD (TENANT_365) | SSO M365 |
 | Stockage | Filesystem local | Corpus, config, projets |
 | LLM | API Claude (Anthropic) | Génération réponses |
@@ -75,7 +74,6 @@
 ### 1.3 Flux réseau
 
 ```
-Teams Client ──HTTPS──▶ Azure Bot Service ──HTTPS──▶ appsec.cc:443/api/bot/messages
 Web Browser  ──HTTPS──▶ appsec.cc:443 (interface web)
 Backend      ──HTTPS──▶ api.anthropic.com (API Claude)
 Backend      ──HTTPS──▶ login.microsoftonline.com (validation tokens)
@@ -99,7 +97,6 @@ Ports ouverts sur le serveur :
 │   │   ├── oauth2.py             # Validation tokens M365
 │   │   └── users.py              # Vérification utilisateurs autorisés
 │   ├── api/
-│   │   ├── bot.py                # Endpoint Bot Teams (/api/bot/messages)
 │   │   ├── web.py                # Endpoints interface web
 │   │   └── admin.py              # Endpoints administration
 │   ├── services/
@@ -205,11 +202,6 @@ oauth2:
   client_id_env: "AZURE_CLIENT_ID"
   client_secret_env: "AZURE_CLIENT_SECRET"
 
-# Bot Teams
-teams_bot:
-  app_id_env: "TEAMS_BOT_APP_ID"
-  app_password_env: "TEAMS_BOT_APP_PASSWORD"
-
 # Serveur
 server:
   host: "0.0.0.0"
@@ -224,8 +216,6 @@ ANTHROPIC_API_KEY=sk-ant-...
 AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 AZURE_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 AZURE_CLIENT_SECRET=...
-TEAMS_BOT_APP_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-TEAMS_BOT_APP_PASSWORD=...
 ```
 
 ### 3.3 Questions de cadrage — `data/config/questions.txt`
@@ -287,13 +277,7 @@ authorized_users:
 
 ## 4. API REST — Endpoints
 
-### 4.1 Bot Teams
-
-| Méthode | Endpoint | Description |
-|---|---|---|
-| POST | `/api/bot/messages` | Endpoint principal du Bot Framework. Reçoit les messages et fichiers du bot Teams |
-
-### 4.2 Interface Web
+### 4.1 Interface Web
 
 | Méthode | Endpoint | Description |
 |---|---|---|
@@ -565,40 +549,9 @@ Stocker les différences détectées dans le fichier `project.json`.
 
 ---
 
-## 7. Bot Teams
+## 7. Authentification
 
-### 7.1 Architecture
-
-Le bot Teams est une application Azure Bot Service (Bot Channel Registration) qui relaie les messages vers le backend FastAPI sur `appsec.cc`.
-
-```
-Teams Client ──▶ Azure Bot Service ──▶ POST https://appsec.cc/api/bot/messages
-                                      ◀── Réponse JSON (texte, fichiers)
-```
-
-### 7.2 Implémentation
-
-**Framework** : `botbuilder-python` (Microsoft Bot Framework SDK pour Python)
-
-Le bot est un composant léger qui :
-1. Reçoit les messages et fichiers de l'utilisateur Teams.
-2. Les transmet au backend via des appels internes.
-3. Affiche les réponses du backend dans Teams.
-4. Gère l'envoi de pièces jointes (documents remplis).
-
-### 7.3 Enregistrement du bot
-
-L'enregistrement du bot se fait manuellement dans le portail Azure (TENANT_365) :
-1. Créer un "Azure Bot" resource.
-2. Configurer le Messaging Endpoint : `https://appsec.cc/api/bot/messages`
-3. Activer le canal Teams.
-4. Enregistrer l'App ID et le password dans `.env`.
-
----
-
-## 8. Authentification
-
-### 8.1 OAuth2 — Interface Web
+### 7.1 OAuth2 — Interface Web
 
 ```
 Navigateur                  appsec.cc              Azure AD (TENANT_365)
@@ -632,11 +585,7 @@ Navigateur                  appsec.cc              Azure AD (TENANT_365)
 
 **Librairie** : `msal` (Microsoft Authentication Library for Python)
 
-### 8.2 OAuth2 — Bot Teams (On-Behalf-Of)
-
-Le bot Teams transmet le token de l'utilisateur au backend. Le backend valide ce token auprès d'Azure AD et vérifie que l'email est dans `users.yaml`.
-
-### 8.3 App Registration dans Azure AD
+### 7.2 App Registration dans Azure AD
 
 Créer une App Registration dans TENANT_365 avec :
 - **Redirect URI** : `https://appsec.cc/api/auth/callback`
@@ -645,7 +594,7 @@ Créer une App Registration dans TENANT_365 avec :
 
 ---
 
-## 9. Nginx — Configuration
+## 8. Nginx — Configuration
 
 ```nginx
 server {
@@ -688,16 +637,16 @@ server {
 
 ---
 
-## 10. Ansible — Playbook
+## 9. Ansible — Playbook
 
-### 10.1 Inventaire — `inventory.ini`
+### 9.1 Inventaire — `inventory.ini`
 
 ```ini
 [pas_server]
 appsec.cc ansible_host=165.232.65.179 ansible_user=root
 ```
 
-### 10.2 Playbook principal — `playbook.yml`
+### 9.2 Playbook principal — `playbook.yml`
 
 ```yaml
 ---
@@ -716,7 +665,7 @@ appsec.cc ansible_host=165.232.65.179 ansible_user=root
     - app
 ```
 
-### 10.3 Rôle `base`
+### 9.3 Rôle `base`
 
 Tâches :
 - Mise à jour système (`apt update && apt upgrade`)
@@ -725,7 +674,7 @@ Tâches :
 - Configuration firewall (UFW) : ports 22, 80, 443
 - Configuration timezone et locale
 
-### 10.4 Rôle `nginx`
+### 9.4 Rôle `nginx`
 
 Tâches :
 - Déploiement configuration Nginx depuis template `nginx.conf.j2`
@@ -733,7 +682,7 @@ Tâches :
 - Configuration renouvellement automatique (cron certbot)
 - Activation et démarrage Nginx
 
-### 10.5 Rôle `app`
+### 9.5 Rôle `app`
 
 Tâches :
 - Création répertoire `/opt/pas-assistant` et sous-répertoires
@@ -744,7 +693,7 @@ Tâches :
 - Déploiement du fichier systemd `pas-assistant.service` depuis template
 - Activation et démarrage du service
 
-### 10.6 Service systemd — `pas-assistant.service`
+### 9.6 Service systemd — `pas-assistant.service`
 
 ```ini
 [Unit]
@@ -767,7 +716,7 @@ WantedBy=multi-user.target
 
 ---
 
-## 11. Dépendances Python — `requirements.txt`
+## 10. Dépendances Python — `requirements.txt`
 
 ```
 fastapi>=0.110
@@ -780,17 +729,14 @@ msal>=1.26
 pyyaml>=6.0
 python-dotenv>=1.0
 httpx>=0.27
-botbuilder-core>=4.14
-botbuilder-integration-aiohttp>=4.14
-aiohttp>=3.9
 pydantic>=2.5
 ```
 
 ---
 
-## 12. Prompts système
+## 11. Prompts système
 
-### 12.1 `system_response.txt` — Génération des réponses
+### 11.1 `system_response.txt` — Génération des réponses
 
 ```
 Tu es un assistant spécialisé dans la rédaction de réponses à des questionnaires
@@ -827,7 +773,7 @@ Retourner un JSON valide avec la structure :
 }
 ```
 
-### 12.2 `system_attention.txt` — Points d'attention
+### 11.2 `system_attention.txt` — Points d'attention
 
 ```
 Tu es un expert sécurité SSI qui analyse un questionnaire de sécurité rempli
@@ -862,7 +808,7 @@ FORMAT DE SORTIE :
 }
 ```
 
-### 12.3 `system_structure.txt` — Analyse de structure
+### 11.3 `system_structure.txt` — Analyse de structure
 
 ```
 Tu es un assistant qui analyse la structure d'un questionnaire de sécurité.
@@ -901,9 +847,9 @@ FORMAT DE SORTIE :
 
 ---
 
-## 13. Sécurité
+## 12. Sécurité
 
-### 13.1 Mesures en place
+### 12.1 Mesures en place
 
 - **HTTPS** obligatoire (Let's Encrypt, redirection HTTP→HTTPS).
 - **Authentification** OAuth2 via Azure AD / TENANT_365.
@@ -914,7 +860,7 @@ FORMAT DE SORTIE :
 - **Firewall** (UFW) : seuls les ports 22, 80, 443 ouverts.
 - **Secrets** dans `.env`, exclu du versioning (`.gitignore`).
 
-### 13.2 Points de vigilance
+### 12.2 Points de vigilance
 
 - Le serveur DigitalOcean stocke des données potentiellement sensibles (questionnaires anonymisés, corpus). Le disque doit être considéré comme un actif à protéger.
 - Les backups du corpus doivent être prévus (snapshot DigitalOcean ou rsync).
@@ -922,22 +868,22 @@ FORMAT DE SORTIE :
 
 ---
 
-## 14. Monitoring et logs
+## 13. Monitoring et logs
 
-### 14.1 Logs applicatifs
+### 13.1 Logs applicatifs
 
 - Logs FastAPI vers `/var/log/pas-assistant/app.log`
 - Rotation des logs via `logrotate`
 - Niveau de log configurable (INFO par défaut)
 
-### 14.2 Health check
+### 13.2 Health check
 
 - Endpoint `GET /api/health` retourne `{"status": "ok"}` (sans authentification)
 - Utilisable pour monitoring externe (UptimeRobot, etc.)
 
 ---
 
-## 15. Évolutions futures (hors V1)
+## 14. Évolutions futures (hors V1)
 
 - Support PDF éditable
 - Interface web avancée (Adaptive Cards, visualisation inline)

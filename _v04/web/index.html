@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS Assistant</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>PAS Assistant</h1>
+    <p>Outil d'aide au remplissage de questionnaires de sécurité.</p>
+    <div id="auth-area">
+      <!-- Populated by checkAuth() -->
+    </div>
+  </main>
+  <script>
+    async function checkAuth() {
+      const area = document.getElementById('auth-area');
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const user = await res.json();
+          area.innerHTML =
+            `<p>Vous êtes connecté en tant que <strong>${user.name}</strong>.</p>` +
+            `<a href="/private" class="btn btn-primary">Accéder à l'application</a>`;
+        } else {
+          area.innerHTML =
+            `<a href="/auth/login" class="btn btn-primary">Se connecter avec Microsoft</a>`;
+        }
+      } catch {
+        area.innerHTML =
+          `<a href="/auth/login" class="btn btn-primary">Se connecter avec Microsoft</a>`;
+      }
+    }
+    checkAuth();
+  </script>
+</body>
+</html>

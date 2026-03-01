@@ -42,7 +42,6 @@ Les réponses générées servent deux objectifs :
 ### 2.1 Inclus dans la V1
 
 - Formats d'entrée : `.xlsx` et `.docx`
-- Bot Microsoft Teams (frontend pur)
 - Interface web basique sur `appsec.cc`
 - Questions de cadrage configurables (fichier texte)
 - Anonymisation par rechercher/remplacer (mots-clés fournis par l'utilisateur)
@@ -86,8 +85,7 @@ Les réponses générées servent deux objectifs :
 | Utilisateur | Uploade le questionnaire, répond aux questions de cadrage, corrige les réponses, valide le document final |
 | PAS Assistant (Backend) | Orchestre le workflow : parsing, anonymisation, appel API Claude, génération des points d'attention, dé-anonymisation |
 | API Claude | Génère les réponses aux questions du questionnaire |
-| Bot Teams | Interface conversationnelle (frontend pur, aucune intelligence) |
-| Interface Web | Interface web basique alternative au bot Teams |
+| Interface Web | Interface web (upload, cadrage, téléchargement du résultat) |
 | Administrateur | Configure les questions de cadrage, gère la base de connaissances, gère la liste des utilisateurs autorisés |
 
 ---
@@ -98,8 +96,8 @@ Les réponses générées servent deux objectifs :
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
-│  Utilisateur │────▶│  Bot Teams   │────▶│   Backend       │
-│              │◀────│  ou Web UI   │◀────│   (FastAPI)     │
+│  Utilisateur │────▶│  Interface  │────▶│   Backend       │
+│              │◀────│  Web        │◀────│   (FastAPI)     │
 └─────────────┘     └─────────────┘     │                 │
                                          │  ┌───────────┐  │
                                          │  │ Parsing   │  │
@@ -335,12 +333,12 @@ Le document de sortie doit conserver la structure d'origine (onglets, colonnes, 
 Les points d'attention sont fournis séparément, soit dans un onglet/section dédié du document, soit dans un fichier texte/markdown annexe.
 
 **F-SORTIE-04 — Livraison**
-Le document rempli et les points d'attention sont envoyés en pièce jointe dans le chat Teams, ou téléchargeables via l'interface web.
+Le document rempli et les points d'attention sont téléchargeables via l'interface web.
 
 ### 6.8 Boucle de correction
 
 **F-CORRECTION-01 — Ré-import**
-L'utilisateur peut modifier le document de sortie en dehors de l'outil (dans Excel ou Word), puis le ré-uploader dans le chat Teams ou l'interface web. Cette étape est optionnelle.
+L'utilisateur peut modifier le document de sortie en dehors de l'outil (dans Excel ou Word), puis le ré-uploader via l'interface web. Cette étape est optionnelle.
 
 **F-CORRECTION-02 — Détection des différences**
 L'outil compare le document ré-importé avec la version qu'il avait générée, et identifie les réponses modifiées par l'utilisateur.
@@ -351,25 +349,7 @@ Les corrections détectées sont persistées. Le document corrigé est ajouté �
 **F-CORRECTION-04 — Ajout volontaire au corpus**
 L'ajout au corpus de référence est automatique après correction. L'utilisateur peut aussi ajouter un questionnaire terminé au corpus sans passer par la boucle de correction.
 
-### 6.9 Interface Bot Teams
-
-**F-TEAMS-01 — Frontend pur**
-Le bot Teams est une couche de présentation uniquement. Il transmet les messages de l'utilisateur au backend et affiche les réponses. Aucune logique métier dans le bot.
-
-**F-TEAMS-02 — Parcours conversationnel**
-Le bot gère le parcours suivant :
-1. L'utilisateur uploade un fichier.
-2. Le bot transmet au backend et affiche les questions de cadrage.
-3. L'utilisateur répond.
-4. Le bot affiche "Traitement en cours…"
-5. Le bot envoie le document rempli + les points d'attention en pièce jointe.
-6. (Optionnel) L'utilisateur ré-uploade un document corrigé.
-7. Le bot confirme la prise en compte.
-
-**F-TEAMS-03 — Gestion des fichiers**
-Le bot Teams doit pouvoir recevoir des fichiers en pièce jointe (upload) et en envoyer (download).
-
-### 6.10 Interface Web
+### 6.9 Interface Web
 
 **F-WEB-01 — Interface basique**
 Une interface web sur `appsec.cc` offre les mêmes fonctionnalités que le bot Teams : upload, questions de cadrage, téléchargement du résultat, ré-import de corrections.
