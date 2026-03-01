@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS Assistant — Application</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <span id="user-info"></span>
+    <a href="/auth/logout" class="btn btn-small">Se déconnecter</a>
+  </header>
+  <main>
+    <h1>PAS Assistant</h1>
+    <p>Application en cours de développement.</p>
+  </main>
+  <script>
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) {
+          window.location.href = '/';
+          return;
+        }
+        const user = await res.json();
+        document.getElementById('user-info').textContent =
+          `${user.name} (${user.email}) — Rôle : ${user.role}`;
+      } catch {
+        window.location.href = '/';
+      }
+    }
+    checkAuth();
+  </script>
+</body>
+</html>
