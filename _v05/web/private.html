@@ -3,216 +3,121 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PAS Assistant</title>
+  <title>PAS Assistant — Application</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <header>
+    <span id="user-info"></span>
+    <a href="/auth/logout" class="btn btn-small">Se déconnecter</a>
+  </header>
+  <main>
+    <h1>PAS Assistant</h1>
 
-<header>
-  <span class="app-title">PAS Assistant</span>
-  <span id="user-info" class="user-info"></span>
-  <a href="/auth/logout" class="btn btn-small">Se déconnecter</a>
-</header>
-
-<main>
-
-  <!-- ── Vue : liste des projets ─────────────────────────────────────────── -->
-  <section id="view-projects">
-    <div class="section-header">
-      <h2>Mes questionnaires</h2>
-      <button onclick="startNewProject()" class="btn btn-primary">+ Nouveau questionnaire</button>
-    </div>
-    <div id="projects-list"></div>
-  </section>
-
-  <!-- ── Étape 1 : Upload ────────────────────────────────────────────────── -->
-  <section id="step-upload" class="wizard-step hidden">
-    <div class="step-header">
-      <button onclick="showProjects()" class="btn btn-small btn-ghost">← Retour</button>
-      <nav class="step-indicator">
-        <span class="step active">1&nbsp;Import</span>
-        <span class="step-sep">›</span><span class="step">2&nbsp;Structure</span>
-        <span class="step-sep">›</span><span class="step">3&nbsp;Cadrage</span>
-        <span class="step-sep">›</span><span class="step">4&nbsp;Anonymisation</span>
-        <span class="step-sep">›</span><span class="step">5&nbsp;Génération</span>
-      </nav>
+    <div id="upload-section">
+      <p>Sélectionnez votre questionnaire (.xlsx) pour commencer.</p>
+      <input type="file" id="file-input" accept=".xlsx">
+      <br><br>
+      <button id="upload-btn" class="btn btn-primary" onclick="uploadFile()">Envoyer</button>
+      <p id="error-msg" style="color:#c0392b; margin-top:1rem;"></p>
     </div>
 
-    <h2>Importer un questionnaire</h2>
-    <p>Déposez votre fichier (.xlsx ou .docx). Claude analysera automatiquement sa structure.</p>
-
-    <div class="upload-zone" id="drop-zone">
-      <div class="upload-icon">📄</div>
-      <p>Glissez-déposez votre fichier ici</p>
-      <p class="hint">ou</p>
-      <label class="btn btn-secondary">
-        Parcourir…
-        <input type="file" id="file-input" accept=".xlsx,.docx" style="display:none">
-      </label>
-      <p class="hint small">Formats : .xlsx, .docx — max 50 Mo</p>
+    <div id="result-section" style="display:none;">
+      <p id="result-msg"></p>
+      <br>
+      <a id="download-working-link" class="btn" href="#">Télécharger working.xlsx (copie brute)</a>
+      <br><br>
+      <button id="roundtrip-btn" class="btn btn-primary" onclick="doRoundtrip()">Tester le round-trip openpyxl</button>
+      <p id="roundtrip-error" style="color:#c0392b; margin-top:1rem;"></p>
     </div>
 
-    <p id="selected-file" class="selected-file hidden"></p>
-    <p id="upload-error" class="error-msg hidden"></p>
-
-    <div id="upload-loading" class="loading-box hidden">
-      <div class="spinner"></div>
-      <span>Analyse de la structure en cours (Claude)…</span>
+    <div id="roundtrip-section" style="display:none;">
+      <p>Round-trip terminé. Téléchargez et comparez avec working.xlsx.</p>
+      <br>
+      <a id="download-roundtrip-link" class="btn btn-primary" href="#">Télécharger roundtrip.xlsx</a>
     </div>
+  </main>
+  <script>
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) { window.location.href = '/'; return; }
+        const user = await res.json();
+        document.getElementById('user-info').textContent =
+          `${user.name} (${user.email})`;
+      } catch {
+        window.location.href = '/';
+      }
+    }
 
-    <div class="btn-row">
-      <button id="btn-upload" class="btn btn-primary hidden" onclick="doUpload()">
-        Analyser le fichier →
-      </button>
-    </div>
-  </section>
+    async function uploadFile() {
+      const fileInput = document.getElementById('file-input');
+      const errorMsg = document.getElementById('error-msg');
+      const btn = document.getElementById('upload-btn');
+      errorMsg.textContent = '';
 
-  <!-- ── Étape 2 : Structure ─────────────────────────────────────────────── -->
-  <section id="step-structure" class="wizard-step hidden">
-    <div class="step-header">
-      <nav class="step-indicator">
-        <span class="step done">1&nbsp;Import</span>
-        <span class="step-sep">›</span><span class="step active">2&nbsp;Structure</span>
-        <span class="step-sep">›</span><span class="step">3&nbsp;Cadrage</span>
-        <span class="step-sep">›</span><span class="step">4&nbsp;Anonymisation</span>
-        <span class="step-sep">›</span><span class="step">5&nbsp;Génération</span>
-      </nav>
-    </div>
+      if (!fileInput.files.length) {
+        errorMsg.textContent = 'Veuillez sélectionner un fichier.';
+        return;
+      }
 
-    <h2>Confirmer la structure détectée</h2>
-    <p>Claude a analysé la structure de votre document. Vérifiez et corrigez si nécessaire.</p>
+      btn.disabled = true;
+      btn.textContent = 'Envoi en cours…';
 
-    <div id="structure-form"></div>
-    <p id="structure-error" class="error-msg hidden"></p>
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
 
-    <div class="btn-row">
-      <button onclick="showStep('upload')" class="btn btn-secondary">← Précédent</button>
-      <button onclick="doValidateStructure()" class="btn btn-primary">Valider →</button>
-    </div>
-  </section>
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json();
+          errorMsg.textContent = err.detail || "Erreur lors de l'envoi.";
+          btn.disabled = false;
+          btn.textContent = 'Envoyer';
+          return;
+        }
+        const data = await res.json();
+        window._projectId = data.project_id;
+        document.getElementById('upload-section').style.display = 'none';
+        document.getElementById('result-section').style.display = 'block';
+        document.getElementById('result-msg').textContent =
+          `Fichier « ${data.filename} » reçu. Projet : ${data.project_id}`;
+        document.getElementById('download-working-link').href = data.download_url;
+      } catch {
+        errorMsg.textContent = 'Erreur réseau.';
+        btn.disabled = false;
+        btn.textContent = 'Envoyer';
+      }
+    }
 
-  <!-- ── Étape 3 : Cadrage ───────────────────────────────────────────────── -->
-  <section id="step-cadrage" class="wizard-step hidden">
-    <div class="step-header">
-      <nav class="step-indicator">
-        <span class="step done">1&nbsp;Import</span>
-        <span class="step-sep">›</span><span class="step done">2&nbsp;Structure</span>
-        <span class="step-sep">›</span><span class="step active">3&nbsp;Cadrage</span>
-        <span class="step-sep">›</span><span class="step">4&nbsp;Anonymisation</span>
-        <span class="step-sep">›</span><span class="step">5&nbsp;Génération</span>
-      </nav>
-    </div>
+    async function doRoundtrip() {
+      const btn = document.getElementById('roundtrip-btn');
+      const errorMsg = document.getElementById('roundtrip-error');
+      errorMsg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Round-trip en cours…';
 
-    <h2>Questions de cadrage</h2>
+      try {
+        const res = await fetch(`/api/projects/${window._projectId}/roundtrip`, { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json();
+          errorMsg.textContent = err.detail || 'Erreur lors du round-trip.';
+          btn.disabled = false;
+          btn.textContent = 'Tester le round-trip openpyxl';
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('roundtrip-section').style.display = 'block';
+        document.getElementById('download-roundtrip-link').href = data.download_url;
+        btn.style.display = 'none';
+      } catch {
+        errorMsg.textContent = 'Erreur réseau.';
+        btn.disabled = false;
+        btn.textContent = 'Tester le round-trip openpyxl';
+      }
+    }
 
-    <div id="cadrage-question-container"></div>
-    <p id="cadrage-error" class="error-msg hidden"></p>
-
-    <div class="btn-row">
-      <button id="btn-cadrage-prev" onclick="cadrageBack()" class="btn btn-secondary">← Précédent</button>
-      <button id="btn-cadrage-next" onclick="cadrageNext()" class="btn btn-primary">Suivant →</button>
-    </div>
-  </section>
-
-  <!-- ── Étape 4 : Anonymisation ─────────────────────────────────────────── -->
-  <section id="step-anonymisation" class="wizard-step hidden">
-    <div class="step-header">
-      <nav class="step-indicator">
-        <span class="step done">1&nbsp;Import</span>
-        <span class="step-sep">›</span><span class="step done">2&nbsp;Structure</span>
-        <span class="step-sep">›</span><span class="step done">3&nbsp;Cadrage</span>
-        <span class="step-sep">›</span><span class="step active">4&nbsp;Anonymisation</span>
-        <span class="step-sep">›</span><span class="step">5&nbsp;Génération</span>
-      </nav>
-    </div>
-
-    <h2>Anonymisation</h2>
-    <p>
-      Renseignez les mots à remplacer avant l'envoi à l'API Claude.
-      La substitution inverse sera effectuée dans le document final.
-      Cette étape est <strong>optionnelle</strong>.
-    </p>
-
-    <table class="anon-table">
-      <thead>
-        <tr>
-          <th>Mot réel (dans le document)</th>
-          <th>Alias anonymisé</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="anon-rows"></tbody>
-    </table>
-    <button onclick="addAnonRow()" class="btn btn-secondary btn-small" style="margin-top:.5rem">
-      + Ajouter un mot
-    </button>
-
-    <p id="anon-error" class="error-msg hidden"></p>
-
-    <div class="btn-row">
-      <button onclick="showStep('cadrage'); renderCadrageQuestion();" class="btn btn-secondary">← Précédent</button>
-      <button onclick="doAnonymize(false)" class="btn btn-outline">Passer cette étape</button>
-      <button onclick="doAnonymize(true)" class="btn btn-primary">Lancer le traitement →</button>
-    </div>
-  </section>
-
-  <!-- ── Étape 5 : Génération ────────────────────────────────────────────── -->
-  <section id="step-generation" class="wizard-step hidden">
-    <div class="step-header">
-      <nav class="step-indicator">
-        <span class="step done">1&nbsp;Import</span>
-        <span class="step-sep">›</span><span class="step done">2&nbsp;Structure</span>
-        <span class="step-sep">›</span><span class="step done">3&nbsp;Cadrage</span>
-        <span class="step-sep">›</span><span class="step done">4&nbsp;Anonymisation</span>
-        <span class="step-sep">›</span><span class="step active">5&nbsp;Génération</span>
-      </nav>
-    </div>
-
-    <h2>Génération</h2>
-
-    <!-- En cours -->
-    <div id="gen-in-progress">
-      <div class="spinner large"></div>
-      <p id="gen-step-label" class="gen-step">Traitement en cours…</p>
-      <div class="progress-track">
-        <div class="progress-bar" id="gen-progress-bar" style="width:0%"></div>
-      </div>
-      <ol id="gen-pipeline-steps" class="pipeline-steps"></ol>
-    </div>
-
-    <!-- Terminé -->
-    <div id="gen-complete" class="hidden">
-      <div class="success-box">
-        <span class="success-icon">✓</span>
-        <strong>Traitement terminé !</strong>
-      </div>
-      <div class="download-grid">
-        <a id="btn-dl-doc" class="btn btn-primary" href="#" download>
-          ⬇ Télécharger le questionnaire rempli
-        </a>
-        <a id="btn-dl-attention" class="btn btn-secondary" href="#" download>
-          ⬇ Télécharger les points d'attention
-        </a>
-      </div>
-      <div class="btn-row" style="margin-top:1.5rem">
-        <button onclick="showProjects()" class="btn btn-outline">← Retour à mes projets</button>
-      </div>
-    </div>
-
-    <!-- Erreur -->
-    <div id="gen-error" class="hidden">
-      <div class="error-box">
-        <p id="gen-error-msg"></p>
-      </div>
-      <div class="btn-row">
-        <button onclick="showProjects()" class="btn btn-secondary">← Retour</button>
-        <button onclick="retryGeneration()" class="btn btn-primary">Réessayer</button>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<script src="/app.js"></script>
+    checkAuth();
+  </script>
 </body>
 </html>

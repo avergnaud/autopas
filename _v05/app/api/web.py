@@ -1,398 +1,239 @@
-"""REST API — endpoints de l'interface web."""
-from __future__ import annotations
+"""PAS Assistant — Web API endpoints."""
 
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Any
+import shutil
+import uuid
+import xml.etree.ElementTree as ET
+import zipfile
+from pathlib import Path
 
 import anyio
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from openpyxl import load_workbook
+from openpyxl.workbook.defined_name import DefinedName
 
 from app.auth.session import get_current_user
-from app.config import get_config
-from app.models.project import DocumentStructure, Project, ProjectStatus, SheetStructure
-from app.services import project_manager, response_generator
+from app.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
 
-_ALLOWED_EXTS = {"xlsx", "docx"}
-_MAX_UPLOAD = 50 * 1024 * 1024  # 50 MB
+router = APIRouter(prefix="/api")
 
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+PROJECTS_DIR = BASE_DIR / "data" / "projects"
 
 
-def _require_project(project_id: str, user: dict) -> Project:
-    project = project_manager.load_project(project_id)
-    if project is None:
-        raise HTTPException(404, f"Projet {project_id} introuvable")
-    if project.user_email != user["email"]:
-        raise HTTPException(403, "Accès interdit")
-    return project
-
-
-def _project_dict(project: Project) -> dict:
-    d = project.model_dump()
-    if project.structure:
-        d["structure"] = project.structure.model_dump()
-    return d
-
-
-def _parse_structure_dict(fmt: str, raw: dict) -> DocumentStructure:
-    """Convert the raw dict (from Claude or from frontend) into DocumentStructure."""
-    if fmt == "xlsx":
-        sheets_data = raw.get("sheets", [])
-        sheets = [
-            SheetStructure(
-                name=s.get("name", "Sheet1"),
-                has_questions=s.get("has_questions", True),
-                id_column=s.get("id_column") or None,
-                question_column=s.get("question_column", "A"),
-                response_columns=s.get("response_columns", ["B"]),
-                header_row=int(s.get("header_row", 1)),
-                first_data_row=int(s.get("first_data_row", 2)),
-            )
-            for s in sheets_data
-        ]
-        if not sheets:
-            sheets = [SheetStructure(name="Sheet1", question_column="A", response_columns=["B"])]
-        return DocumentStructure(format="xlsx", sheets=sheets)
-    else:
-        return DocumentStructure(
-            format="docx",
-            pattern=raw.get("pattern", ""),
-            response_marker=raw.get("response_marker", "Réponse du titulaire"),
-        )
-
-
-def _default_structure(fmt: str) -> DocumentStructure:
-    if fmt == "xlsx":
-        return DocumentStructure(
-            format="xlsx",
-            sheets=[SheetStructure(name="Sheet1", question_column="A", response_columns=["B"])],
-        )
-    return DocumentStructure(format="docx", response_marker="Réponse du titulaire")
-
-
-# ─── POST /api/projects — Upload + structure analysis ─────────────────────────
-
-
-@router.post("/api/projects")
-async def create_project(
+@router.post("/upload")
+async def upload_file(
     file: UploadFile,
     user: dict = Depends(get_current_user),
 ) -> dict:
-    """Upload questionnaire, detect structure via Claude, return project."""
-    filename = file.filename or ""
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ext not in _ALLOWED_EXTS:
-        raise HTTPException(400, f"Format non supporté : .{ext}. Acceptés : xlsx, docx")
+    """Upload an xlsx file and create a project directory with a working copy.
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, "Fichier vide")
-    if len(file_bytes) > _MAX_UPLOAD:
-        raise HTTPException(413, "Fichier trop volumineux (max 50 Mo)")
+    Args:
+        file: The uploaded xlsx file.
+        user: The authenticated user (injected by dependency).
 
-    project = project_manager.create_project(user["email"], filename, file_bytes)
+    Returns:
+        project_id and download_url for the working copy.
+    """
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Seuls les fichiers .xlsx sont acceptés.")
 
-    # Analyze structure via Claude (run in thread pool to avoid blocking the event loop)
-    try:
-        from app.services import claude_client, parser_xlsx, parser_docx
-        orig_path = project_manager.get_original_path(project.id, ext)
-        if ext == "xlsx":
-            raw_content = parser_xlsx.extract_raw_content(orig_path)
-        else:
-            raw_content = parser_docx.extract_raw_content(orig_path)
+    project_id = str(uuid.uuid4())
+    project_dir = PROJECTS_DIR / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
 
-        structure_data = await anyio.to_thread.run_sync(
-            lambda: claude_client.analyze_structure(raw_content, ext)
-        )
-        inner = structure_data.get("structure", structure_data)
-        structure = _parse_structure_dict(ext, inner)
-    except Exception as exc:
-        logger.error("Structure analysis failed for %s: %s", project.id, exc)
-        structure = _default_structure(ext)
+    original_path = project_dir / "original.xlsx"
+    working_path = project_dir / "working.xlsx"
 
-    project.structure = structure
-    project.status = ProjectStatus.structure_detected
-    project_manager.save_project(project)
-    return _project_dict(project)
+    content = await file.read()
+    original_path.write_bytes(content)
 
+    shutil.copy2(original_path, working_path)
 
-# ─── GET /api/projects ────────────────────────────────────────────────────────
+    logger.info(
+        "Project %s created by %s — original file: %s (%d bytes)",
+        project_id,
+        user["email"],
+        file.filename,
+        len(content),
+    )
 
-
-@router.get("/api/projects")
-async def list_projects(user: dict = Depends(get_current_user)) -> list[dict]:
-    projects = project_manager.list_projects(user["email"])
-    return [_project_dict(p) for p in projects]
-
-
-# ─── GET /api/projects/{id} ───────────────────────────────────────────────────
-
-
-@router.get("/api/projects/{project_id}")
-async def get_project(project_id: str, user: dict = Depends(get_current_user)) -> dict:
-    return _project_dict(_require_project(project_id, user))
-
-
-# ─── PUT /api/projects/{id}/structure ─────────────────────────────────────────
-
-
-class StructureBody(BaseModel):
-    structure: dict[str, Any]
-
-
-@router.put("/api/projects/{project_id}/structure")
-async def update_structure(
-    project_id: str,
-    body: StructureBody,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    """Validate / correct the detected structure."""
-    project = _require_project(project_id, user)
-    project.structure = _parse_structure_dict(project.format, body.structure)
-    project.status = ProjectStatus.structure_detected
-    project_manager.save_project(project)
-    return _project_dict(project)
-
-
-# ─── GET /api/projects/{id}/questions ─────────────────────────────────────────
-
-
-@router.get("/api/projects/{project_id}/questions")
-async def get_questions(
-    project_id: str,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    """Return cadrage questions parsed from questions.txt."""
-    _require_project(project_id, user)
-    config = get_config()
-    raw_questions: list[dict] = config.get("questions", [])
-    verbosity_levels: dict = config.get("verbosity", {}).get("levels", {})
-
-    api_questions = []
-    for idx, q in enumerate(raw_questions):
-        condition = None
-        raw_cond: str | None = q.get("condition")
-        if raw_cond:
-            # "previous == \"value\"" or "previous contains \"value\""
-            # Resolve "previous" to the question index before this one (1-based id)
-            prev_id = idx  # idx is 0-based; id will be idx+1; previous = idx
-            if "contains" in raw_cond:
-                m = re.search(r'"([^"]+)"', raw_cond)
-                value = m.group(1) if m else ""
-                condition = {"question_id": prev_id, "operator": "contains", "value": value}
-            else:
-                m = re.search(r'"([^"]+)"', raw_cond)
-                value = m.group(1) if m else ""
-                condition = {"question_id": prev_id, "operator": "equals", "value": value}
-
-        api_questions.append({
-            "id": idx + 1,
-            "text": q.get("text", ""),
-            "type": "options" if q.get("options") else q.get("type", "text"),
-            "options": q.get("options"),
-            "multi": q.get("multi", False),
-            "condition": condition,
-        })
-
-    verbosity_options = [
-        f"{lvl} — {data.get('label', '')} ({data.get('max_words', '')} mots max)"
-        for lvl, data in sorted(verbosity_levels.items(), key=lambda x: int(x[0]))
-    ]
-
-    verbosity_question = {
-        "id": 99,
-        "text": "Quel niveau de détail souhaitez-vous pour les réponses ?",
-        "type": "options",
-        "options": verbosity_options,
-        "multi": False,
-        "condition": None,
-    }
-
-    return {"questions": api_questions, "verbosity_question": verbosity_question}
-
-
-# ─── POST /api/projects/{id}/cadrage ──────────────────────────────────────────
-
-
-class CadrageBody(BaseModel):
-    answers: dict[str, Any]
-    verbosity_level: int = 2
-
-
-@router.post("/api/projects/{project_id}/cadrage")
-async def submit_cadrage(
-    project_id: str,
-    body: CadrageBody,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    project = _require_project(project_id, user)
-    project.cadrage = body.answers
-    project.verbosity_level = body.verbosity_level
-    project.status = ProjectStatus.cadrage
-    project_manager.save_project(project)
-    return _project_dict(project)
-
-
-# ─── POST /api/projects/{id}/anonymize ────────────────────────────────────────
-
-
-class AnonymizeBody(BaseModel):
-    mappings: list[dict[str, str]]  # [{"real": "...", "alias": "..."}]
-
-
-@router.post("/api/projects/{project_id}/anonymize")
-async def submit_anonymize(
-    project_id: str,
-    body: AnonymizeBody,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    project = _require_project(project_id, user)
-    project.anonymization = {
-        m["real"]: m["alias"] for m in body.mappings if m.get("real") and m.get("alias")
-    }
-    project.status = ProjectStatus.anonymizing
-    project_manager.save_project(project)
-    return _project_dict(project)
-
-
-# ─── POST /api/projects/{id}/generate ─────────────────────────────────────────
-
-
-@router.post("/api/projects/{project_id}/generate")
-async def start_generation(
-    project_id: str,
-    background_tasks: BackgroundTasks,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    """Launch generation in a background task."""
-    project = _require_project(project_id, user)
-
-    if project.status == ProjectStatus.generating:
-        raise HTTPException(409, "Génération déjà en cours")
-    if project.status == ProjectStatus.completed:
-        raise HTTPException(409, "Génération déjà terminée. Créez un nouveau projet pour relancer.")
-
-    project.status = ProjectStatus.generating
-    project.progress_step = "Démarrage du traitement..."
-    project.progress_pct = 0
-    project.error_message = None
-    project.generation_started_at = datetime.now(timezone.utc).isoformat()
-    project_manager.save_project(project)
-
-    background_tasks.add_task(response_generator.run_generation, project)
-    return _project_dict(project)
-
-
-# ─── GET /api/projects/{id}/status ────────────────────────────────────────────
-
-
-@router.get("/api/projects/{project_id}/status")
-async def get_status(
-    project_id: str,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    """Polling endpoint for generation status."""
-    project = _require_project(project_id, user)
     return {
-        "id": project.id,
-        "status": project.status,
-        "progress_step": project.progress_step,
-        "progress_pct": project.progress_pct,
-        "error_message": project.error_message,
+        "project_id": project_id,
+        "filename": file.filename,
+        "download_url": f"/api/projects/{project_id}/working",
     }
 
 
-# ─── GET /api/projects/{id}/output ────────────────────────────────────────────
-
-
-@router.get("/api/projects/{project_id}/output")
-async def download_output(
+@router.get("/projects/{project_id}/working")
+async def download_working(
     project_id: str,
     user: dict = Depends(get_current_user),
 ) -> FileResponse:
-    project = _require_project(project_id, user)
-    if project.status != ProjectStatus.completed:
-        raise HTTPException(400, "Document pas encore disponible")
+    """Download the working copy of a project.
 
-    output_path = project_manager.get_output_path(project.id, project.format)
-    if not output_path.exists():
-        raise HTTPException(404, "Fichier de sortie introuvable")
+    Args:
+        project_id: UUID of the project.
+        user: The authenticated user (injected by dependency).
+    """
+    working_path = PROJECTS_DIR / project_id / "working.xlsx"
+    if not working_path.exists():
+        raise HTTPException(status_code=404, detail="Projet introuvable.")
 
-    media_types = {
-        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }
     return FileResponse(
-        str(output_path),
-        media_type=media_types.get(project.format, "application/octet-stream"),
-        filename=f"PAS_rempli_{project_id}.{project.format}",
+        path=str(working_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="working.xlsx",
     )
 
 
-# ─── GET /api/projects/{id}/attention ─────────────────────────────────────────
+_XLSX_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 
 
-@router.get("/api/projects/{project_id}/attention")
-async def download_attention(
+def _safe_local_defined_names(xlsx_path: Path) -> list[tuple[str, str, int | None]]:
+    """Extract safe, local defined names directly from workbook.xml.
+
+    openpyxl's DefinedNameDict is keyed by name only, so when the same name
+    appears twice in the XML (once sheet-scoped with localSheetId, once as a
+    broken workbook-level external ref), the external #REF! entry silently
+    overwrites the valid local one.  We read the raw XML first, before openpyxl
+    touches it, to capture the local definitions that openpyxl would lose.
+
+    Returns a list of (name, attr_text, local_sheet_id) for names that:
+    - reference cells inside this workbook (no [n] external-workbook notation)
+    - are not already broken (#REF!)
+    - are not _xlnm.* built-ins (autofilter databases, etc.)
+    - are not hidden
+    """
+    with zipfile.ZipFile(xlsx_path) as z:
+        with z.open("xl/workbook.xml") as f:
+            tree = ET.parse(f)
+
+    results = []
+    for dn in tree.iter(f"{{{_XLSX_NS}}}definedName"):
+        name = dn.get("name", "")
+        value = dn.text or ""
+        hidden = dn.get("hidden", "0") == "1"
+        local_sheet_id_raw = dn.get("localSheetId")
+
+        if name.startswith("_xlnm."):
+            continue
+        if hidden:
+            continue
+        if "#REF" in value or re.search(r"\[\d+\]", value):
+            continue
+
+        sid = int(local_sheet_id_raw) if local_sheet_id_raw is not None else None
+        results.append((name, value, sid))
+
+    return results
+
+
+def _openpyxl_roundtrip(working_path: Path, roundtrip_path: Path) -> None:
+    """Open working.xlsx with openpyxl and save it unchanged to roundtrip.xlsx.
+
+    This is a synchronous function intended to be run in a thread via anyio.
+    It does not modify any cell, sheet, or property — pure open/save identity.
+
+    keep_links=False: discard external link definitions (references to other xlsx
+    files). openpyxl cannot round-trip them correctly and produces broken XML that
+    triggers Excel's repair dialog. Cached cell values are preserved.
+
+    Named ranges: openpyxl serializes them from three sources (workbook/_writer.py):
+    wb.defined_names, ws.defined_names, and ws.print_area / ws.print_titles.
+    We clear all three to eliminate broken external-reference entries.
+    We then re-inject only the safe local definitions recovered from the raw XML,
+    so that data-validation dropdowns (e.g. the "Cotation" list on column F)
+    continue to work in the output file.
+    """
+    # Step 1: capture safe local defined names from raw XML before openpyxl
+    # loses them (it de-duplicates by name, keeping the broken external entry).
+    safe_names = _safe_local_defined_names(working_path)
+
+    # Step 2: load workbook, stripping external links.
+    wb = load_workbook(working_path, keep_links=False)
+
+    # Step 3: clear ALL defined names from every source to prevent broken XML.
+    wb_count = len(wb.defined_names)
+    wb.defined_names.clear()
+    ws_count = 0
+    for ws in wb.worksheets:
+        ws_count += len(ws.defined_names)
+        ws.defined_names.clear()
+        ws.print_area = None
+        ws.print_title_rows = None
+        ws.print_title_cols = None
+
+    # Step 4: re-inject only the safe local names so dropdowns keep working.
+    for name, attr_text, local_sheet_id in safe_names:
+        dn = DefinedName(name=name, attr_text=attr_text, localSheetId=local_sheet_id)
+        wb.defined_names.add(dn)
+
+    logger.info(
+        "Defined names: cleared %d workbook-level + %d sheet-level, "
+        "re-injected %d safe local names: %s",
+        wb_count,
+        ws_count,
+        len(safe_names),
+        [n for n, _, _ in safe_names],
+    )
+
+    wb.save(roundtrip_path)
+    wb.close()
+
+
+@router.post("/projects/{project_id}/roundtrip")
+async def roundtrip(
+    project_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Open working.xlsx with openpyxl and save it unchanged to roundtrip.xlsx.
+
+    This verifies that openpyxl can round-trip the file without corruption,
+    before any actual transformation is applied.
+
+    Args:
+        project_id: UUID of the project.
+        user: The authenticated user (injected by dependency).
+
+    Returns:
+        download_url for roundtrip.xlsx.
+    """
+    working_path = PROJECTS_DIR / project_id / "working.xlsx"
+    if not working_path.exists():
+        raise HTTPException(status_code=404, detail="Projet introuvable.")
+
+    roundtrip_path = PROJECTS_DIR / project_id / "roundtrip.xlsx"
+
+    await anyio.to_thread.run_sync(
+        lambda: _openpyxl_roundtrip(working_path, roundtrip_path)
+    )
+
+    logger.info("Roundtrip done for project %s by %s", project_id, user["email"])
+
+    return {"download_url": f"/api/projects/{project_id}/roundtrip"}
+
+
+@router.get("/projects/{project_id}/roundtrip")
+async def download_roundtrip(
     project_id: str,
     user: dict = Depends(get_current_user),
 ) -> FileResponse:
-    project = _require_project(project_id, user)
-    if project.status != ProjectStatus.completed:
-        raise HTTPException(400, "Points d'attention pas encore disponibles")
+    """Download the openpyxl round-trip result.
 
-    attention_path = project_manager.get_attention_path(project.id)
-    if not attention_path.exists():
-        raise HTTPException(404, "Fichier points d'attention introuvable")
+    Args:
+        project_id: UUID of the project.
+        user: The authenticated user (injected by dependency).
+    """
+    roundtrip_path = PROJECTS_DIR / project_id / "roundtrip.xlsx"
+    if not roundtrip_path.exists():
+        raise HTTPException(status_code=404, detail="Round-trip non effectué.")
 
     return FileResponse(
-        str(attention_path),
-        media_type="text/markdown; charset=utf-8",
-        filename=f"points_attention_{project_id}.md",
+        path=str(roundtrip_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="roundtrip.xlsx",
     )
-
-
-# ─── DELETE /api/projects/{id} ────────────────────────────────────────────────
-
-
-@router.delete("/api/projects/{project_id}")
-async def delete_project(
-    project_id: str,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    """Delete a project and all its associated data."""
-    _require_project(project_id, user)
-    project_manager.delete_project(project_id)
-    return {"deleted": project_id}
-
-
-# ─── POST /api/projects/{id}/corrections ──────────────────────────────────────
-
-
-@router.post("/api/projects/{project_id}/corrections")
-async def upload_correction(
-    project_id: str,
-    file: UploadFile,
-    user: dict = Depends(get_current_user),
-) -> dict:
-    project = _require_project(project_id, user)
-    if project.status != ProjectStatus.completed:
-        raise HTTPException(400, "Le projet doit être complété avant de soumettre une correction")
-
-    file_bytes = await file.read()
-    corrections_dir = project_manager._project_dir(project.id) / "corrections"
-    corrections_dir.mkdir(exist_ok=True)
-    v = project.corrections_count + 1
-    (corrections_dir / f"v{v}.{project.format}").write_bytes(file_bytes)
-
-    project.corrections_count += 1
-    project_manager.save_project(project)
-    return {"message": "Correction enregistrée", "version": v}

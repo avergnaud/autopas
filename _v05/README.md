@@ -1,38 +1,40 @@
 # PAS Assistant — v05
 
-## Contenu de cette itération
+## Développement local (WSL Ubuntu)
 
-Phase 2 à 5 — Interface web complète + backend API :
+### 1. Prérequis système (une seule fois)
 
-- `web/private.html` + `web/app.js` — Wizard complet (5 étapes : upload, structure, cadrage, anonymisation, génération/téléchargement)
-- `web/style.css` — Styles mis à jour
-- `app/api/web.py` — Endpoints REST : projets, structure, questions, cadrage, anonymisation, génération, status, output, attention
-- `app/services/project_manager.py` — Gestion cycle de vie d'un projet (états, filesystem)
-- `app/services/parser_xlsx.py` — Parsing questionnaires xlsx (openpyxl)
-- `app/services/parser_docx.py` — Parsing questionnaires docx (python-docx)
-- `app/services/anonymizer.py` — Anonymisation / dé-anonymisation
-- `app/services/reference_selector.py` — Sélection fichiers de référence par similarité
-- `app/services/claude_client.py` — Client API Claude (appel principal + points d'attention)
-- `app/models/` — Modèles Pydantic (projet, questions, métadonnées)
+```bash
+sudo apt update && sudo apt install python3-pip python3-venv -y
+```
 
-## Décisions UX/techniques
-
-- **Wizard step-by-step** : une question de cadrage par écran, navigation Précédent/Suivant
-- **Frontend vanilla** : HTML/CSS/JS sans framework, sans build step
-- **Anonymisation** : tableau de paires clé→valeur dynamiques
-- **Génération async** : polling toutes les 3s sur GET /api/projects/{id}/status
-- **Confirmation de structure** : étape simplifiée affichant les colonnes détectées par Claude
-
-## Lancer en développement
+### 2. Venv
 
 ```bash
 cd _v05
-export PAS_BASE_DIR=.
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Accès : `http://localhost:8000/`
+### 3. Fichier `.env`
 
+```bash
+cp .env.example .env
+```
+
+Avec `DEV_AUTH_BYPASS=true`, aucune variable n'est obligatoire pour tester l'upload/download.
+
+### 5. Lancer
+
+```bash
+source venv/bin/activate
+PAS_BASE_DIR=. uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Ouvrir : `http://localhost:8000`
+
+---
+
+> **Note Python :** Le projet cible Python 3.12. Si la version système (3.10) pose problème :
+> `sudo apt install python3.12 python3.12-venv` puis remplacer `python3` par `python3.12`.

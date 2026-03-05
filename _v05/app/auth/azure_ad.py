@@ -35,6 +35,18 @@ def _get_msal_app() -> msal.ConfidentialClientApplication:
     return _msal_app
 
 
+def _redirect_uri() -> str:
+    """Return the OAuth2 redirect URI.
+
+    The environment variable OAUTH2_REDIRECT_URI overrides app.yaml,
+    which is useful for local development (http://localhost:8000/auth/callback).
+    """
+    override = os.environ.get("OAUTH2_REDIRECT_URI")
+    if override:
+        return override
+    return get_config()["oauth2"]["redirect_uri"]
+
+
 def build_auth_url(state: str) -> str:
     """Build the Azure AD authorization URL.
 
@@ -48,7 +60,7 @@ def build_auth_url(state: str) -> str:
     return _get_msal_app().get_authorization_request_url(
         scopes=cfg["scopes"],
         state=state,
-        redirect_uri=cfg["redirect_uri"],
+        redirect_uri=_redirect_uri(),
     )
 
 
@@ -68,7 +80,7 @@ def exchange_code(code: str) -> dict[str, Any]:
     result: dict[str, Any] = _get_msal_app().acquire_token_by_authorization_code(
         code=code,
         scopes=cfg["scopes"],
-        redirect_uri=cfg["redirect_uri"],
+        redirect_uri=_redirect_uri(),
     )
     if "error" in result:
         error_desc = result.get("error_description", result.get("error", "unknown"))

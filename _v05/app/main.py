@@ -14,7 +14,6 @@ from app.api.web import router as web_router
 from app.auth.router import router as auth_router
 from app.auth.session import get_current_user, get_optional_user
 from app.config import BASE_DIR, load_config
-from app.models.project import ProjectStatus
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,31 +28,10 @@ if _env_file.exists():
     load_dotenv(_env_file)
 
 
-def _recover_stale_generating_projects() -> None:
-    """Reset projects stuck in 'generating' state (e.g. after an unclean restart)."""
-    from app.services.project_manager import PROJECTS_DIR, load_project, save_project
-
-    if not PROJECTS_DIR.exists():
-        return
-    for d in PROJECTS_DIR.iterdir():
-        if not d.is_dir():
-            continue
-        project = load_project(d.name)
-        if project and project.status == ProjectStatus.generating:
-            logger.warning(
-                "Project %s was stuck in 'generating' state — marking as error", project.id
-            )
-            project.status = ProjectStatus.error
-            project.error_message = "Traitement interrompu (redémarrage du serveur)."
-            project.progress_step = "Erreur : traitement interrompu"
-            save_project(project)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load full configuration at startup."""
     load_config()
-    _recover_stale_generating_projects()
     logger.info("PAS Assistant started")
     yield
     logger.info("PAS Assistant stopped")
@@ -72,7 +50,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SESSION_SECRET_KEY", "dev-changeme-in-prod"),
     max_age=86400,
-    https_only=True,
+    https_only=os.environ.get("SESSION_HTTPS_ONLY", "true").lower() != "false",
     same_site="lax",
 )
 
