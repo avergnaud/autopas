@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS Assistant — Application</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* Keyword rows */
+    .kw-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin: 0.5rem 0 1rem;
+    }
+    .kw-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .kw-row input[type="text"] {
+      flex: 1;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      font-family: monospace;
+    }
+    .kw-row input[type="text"]:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+    .kw-arrow {
+      color: #888;
+      flex-shrink: 0;
+    }
+    .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      color: #999;
+      padding: 0 0.25rem;
+      flex-shrink: 0;
+    }
+    .btn-icon:hover { color: #c0392b; }
+    .btn-add {
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    /* Mapping table */
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .mapping-table th {
+      background: #f0f4ff;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid #d0d8f0;
+      font-weight: 600;
+    }
+    .mapping-table td {
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid #eee;
+      font-family: monospace;
+    }
+    .mapping-table tr:last-child td {
+      border-bottom: none;
+    }
+    .section-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+    .step-hint {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 1rem;
+    }
+    .success-msg {
+      color: #2e7d32;
+      font-weight: 500;
+      margin-bottom: 1rem;
+    }
+    .deleted-label {
+      color: #c0392b;
+      font-style: italic;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span id="user-info"></span>
+    <a href="/auth/logout" class="btn btn-small">Se déconnecter</a>
+  </header>
+  <main>
+    <h1>PAS Assistant</h1>
+
+    <!-- ===== STEP 1: Upload ===== -->
+    <div id="upload-section">
+      <p>Sélectionnez votre questionnaire (.xlsx) pour commencer.</p>
+      <input type="file" id="file-input" accept=".xlsx">
+      <br><br>
+      <button id="upload-btn" class="btn btn-primary" onclick="uploadFile()">Envoyer</button>
+      <p id="upload-error" style="color:#c0392b; margin-top:1rem;"></p>
+    </div>
+
+    <!-- ===== STEP 2: Keywords ===== -->
+    <div id="keywords-section" style="display:none;">
+      <p class="step-hint">Etape 2 / 2 — Définir les mots-clés à anonymiser</p>
+
+      <div id="metadata-loading">
+        <p style="color:#888;">Analyse des métadonnées du fichier…</p>
+      </div>
+
+      <div id="metadata-ready" style="display:none;">
+        <p class="section-label">Mots-clés à anonymiser</p>
+        <p class="step-hint" style="margin-top:0;">Pour chaque ligne : mot-clé original → remplacement dans le fichier.</p>
+
+        <div id="kw-rows" class="kw-rows"></div>
+
+        <button class="btn btn-small btn-add" onclick="addRow('', '')">+ Ajouter une ligne</button>
+
+        <button id="anonymize-btn" class="btn btn-primary" onclick="doAnonymize()">Anonymiser</button>
+        <p id="anonymize-error" style="color:#c0392b; margin-top:0.75rem;"></p>
+      </div>
+    </div>
+
+    <!-- ===== STEP 3: Result ===== -->
+    <div id="anonymized-section" style="display:none;">
+      <p class="success-msg">Anonymisation terminée.</p>
+
+      <p class="section-label">Mots-clés — cellules</p>
+      <table class="mapping-table" id="mapping-table">
+        <thead>
+          <tr><th>Mot-clé original</th><th>Remplacement</th></tr>
+        </thead>
+        <tbody id="mapping-tbody"></tbody>
+      </table>
+
+      <div id="metadata-deleted-section" style="display:none;">
+        <p class="section-label" style="margin-top:1rem;">Métadonnées supprimées</p>
+        <table class="mapping-table">
+          <thead>
+            <tr><th>Champ</th><th>Valeur originale</th><th>Action</th></tr>
+          </thead>
+          <tbody id="metadata-deleted-tbody"></tbody>
+        </table>
+      </div>
+
+      <a id="download-anonymized-link" class="btn btn-primary" href="#">
+        Télécharger anonymized.xlsx
+      </a>
+    </div>
+  </main>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Utilities
+    // -----------------------------------------------------------------------
+
+    function showSection(id) {
+      ['upload-section', 'keywords-section', 'anonymized-section'].forEach(s => {
+        document.getElementById(s).style.display = (s === id) ? '' : 'none';
+      });
+    }
+
+    function setError(id, msg) {
+      document.getElementById(id).textContent = msg;
+    }
+
+    // -----------------------------------------------------------------------
+    // Auth
+    // -----------------------------------------------------------------------
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) { window.location.href = '/'; return; }
+        const user = await res.json();
+        document.getElementById('user-info').textContent =
+          `${user.name} (${user.email})`;
+      } catch {
+        window.location.href = '/';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 1 — Upload
+    // -----------------------------------------------------------------------
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('file-input');
+      const btn = document.getElementById('upload-btn');
+      setError('upload-error', '');
+
+      if (!fileInput.files.length) {
+        setError('upload-error', 'Veuillez sélectionner un fichier.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Envoi en cours…';
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json();
+          setError('upload-error', err.detail || "Erreur lors de l'envoi.");
+          btn.disabled = false;
+          btn.textContent = 'Envoyer';
+          return;
+        }
+        const data = await res.json();
+        window._projectId = data.project_id;
+
+        showSection('keywords-section');
+        loadMetadata();
+      } catch {
+        setError('upload-error', 'Erreur réseau.');
+        btn.disabled = false;
+        btn.textContent = 'Envoyer';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 2 — Keyword rows
+    // -----------------------------------------------------------------------
+
+    function addRow(original, replacement) {
+      const container = document.getElementById('kw-rows');
+      const row = document.createElement('div');
+      row.className = 'kw-row';
+      row.innerHTML =
+        `<input type="text" class="kw-original" placeholder="Mot-clé original" value="${escapeAttr(original)}">` +
+        `<span class="kw-arrow">→</span>` +
+        `<input type="text" class="kw-replacement" placeholder="Remplacement" value="${escapeAttr(replacement)}">` +
+        `<button class="btn-icon" title="Supprimer" onclick="this.closest('.kw-row').remove()">&#x1F5D1;</button>`;
+      container.appendChild(row);
+    }
+
+    function escapeAttr(str) {
+      return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    async function loadMetadata() {
+      document.getElementById('metadata-loading').style.display = '';
+      document.getElementById('metadata-ready').style.display = 'none';
+      document.getElementById('kw-rows').innerHTML = '';
+
+      try {
+        const res = await fetch(`/api/projects/${window._projectId}/metadata`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        window._metaData = data.metadata || {};
+        (data.suggestions || []).forEach(val => addRow(val, ''));
+      } catch {
+        window._metaData = {};
+        // no suggestions — user will fill manually
+      }
+
+      // Always show one empty row if none were added
+      if (!document.getElementById('kw-rows').children.length) addRow('', '');
+
+      document.getElementById('metadata-loading').style.display = 'none';
+      document.getElementById('metadata-ready').style.display = '';
+    }
+
+    function getKeywords() {
+      const pairs = [];
+      document.querySelectorAll('.kw-row').forEach(row => {
+        const original = row.querySelector('.kw-original').value.trim();
+        const replacement = row.querySelector('.kw-replacement').value.trim();
+        if (original && replacement) pairs.push({ original, replacement });
+      });
+      return pairs;
+    }
+
+    async function doAnonymize() {
+      const btn = document.getElementById('anonymize-btn');
+      setError('anonymize-error', '');
+
+      const keywords = getKeywords();
+      if (keywords.length === 0) {
+        setError('anonymize-error', 'Ajoutez au moins une paire mot-clé / remplacement.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Anonymisation en cours…';
+
+      try {
+        const res = await fetch(`/api/projects/${window._projectId}/anonymize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setError('anonymize-error', err.detail || "Erreur lors de l'anonymisation.");
+          btn.disabled = false;
+          btn.textContent = 'Anonymiser';
+          return;
+        }
+        const data = await res.json();
+        renderResult(data);
+      } catch {
+        setError('anonymize-error', 'Erreur réseau.');
+        btn.disabled = false;
+        btn.textContent = 'Anonymiser';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 3 — Result
+    // -----------------------------------------------------------------------
+
+    function renderResult(data) {
+      const fieldLabels = {
+        creator: 'Auteur', lastModifiedBy: 'Dernière modif.', title: 'Titre',
+        subject: 'Sujet', description: 'Description', keywords: 'Mots-clés',
+        company: 'Société', application: 'Application',
+      };
+
+      // Keyword mapping table (cells)
+      const tbody = document.getElementById('mapping-tbody');
+      tbody.innerHTML = '';
+      Object.entries(data.mapping || {}).forEach(([kw, replacement]) => {
+        const tr = document.createElement('tr');
+        const cell = replacement === ''
+          ? '<span class="deleted-label">supprimé</span>'
+          : escapeHtml(replacement);
+        tr.innerHTML = `<td>${escapeHtml(kw)}</td><td>${cell}</td>`;
+        tbody.appendChild(tr);
+      });
+
+      // Metadata deleted section
+      const metaEntries = Object.entries(window._metaData || {}).filter(([, v]) => v);
+      const metaSection = document.getElementById('metadata-deleted-section');
+      if (metaEntries.length > 0) {
+        const metaTbody = document.getElementById('metadata-deleted-tbody');
+        metaTbody.innerHTML = '';
+        metaEntries.forEach(([field, value]) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${escapeHtml(fieldLabels[field] || field)}</td>` +
+            `<td>${escapeHtml(value)}</td>` +
+            `<td><span class="deleted-label">supprimé</span></td>`;
+          metaTbody.appendChild(tr);
+        });
+        metaSection.style.display = '';
+      } else {
+        metaSection.style.display = 'none';
+      }
+
+      document.getElementById('download-anonymized-link').href = data.download_url;
+      showSection('anonymized-section');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // -----------------------------------------------------------------------
+    // Init
+    // -----------------------------------------------------------------------
+
+    checkAuth();
+  </script>
+</body>
+</html>
