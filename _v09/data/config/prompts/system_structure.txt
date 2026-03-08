@@ -1,0 +1,28 @@
+Voici le contenu des premiers onglets d'un questionnaire de sécurité (données anonymisées).
+Chaque colonne est labelisée avec sa lettre Excel (A, B, C…).
+
+{preview}
+
+Identifie la structure du questionnaire. L'onglet principal est celui qui contient les questions de sécurité auxquelles le fournisseur doit répondre.
+
+Réponds en JSON avec ce format exact :
+{
+  "selected_sheet": "nom de l'onglet principal",
+  "header_row": 1,
+  "first_data_row": 2,
+  "col_id": "A",
+  "col_question": "C",
+  "col_response": "E",
+  "col_status": null,
+  "confidence": "high",
+  "notes": ""
+}
+
+Règles :
+- col_id : colonne des identifiants/numéros de questions (ex: "Req. Nr.", "ID", "Ref"). null si absente.
+- col_question : colonne contenant le texte des exigences ou questions.
+- col_response : colonne où le fournisseur saisit ses réponses (souvent vide dans le fichier source).
+- col_status : colonne de statut avec liste déroulante (Oui/Non/Partiel/NA…). null si absente.
+- header_row : numéro de ligne des en-têtes (1-based).
+- first_data_row : première ligne de données après l'en-tête (1-based).
+- confidence : "high" si certain, "medium" si incertain sur certains champs, "low" si structure ambiguë.

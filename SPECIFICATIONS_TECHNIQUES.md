@@ -284,11 +284,11 @@ authorized_users:
 | GET | `/api/auth/login` | Initie le flow OAuth2 (redirect vers Azure AD) |
 | GET | `/api/auth/callback` | Callback OAuth2 |
 | GET | `/api/auth/me` | Retourne l'utilisateur courant |
-| POST | `/api/projects` | Crée un nouveau projet (upload questionnaire + analyse structure) |
+| POST | `/api/projects` | Crée un nouveau projet (upload questionnaire .xlsx) |
 | GET | `/api/projects` | Liste les projets de l'utilisateur |
 | GET | `/api/projects/{id}` | Détail d'un projet |
 | PUT | `/api/projects/{id}/structure` | Valide / corrige la structure détectée |
-| GET | `/api/projects/{id}/questions` | Retourne la liste des questions de cadrage |
+| GET | `/api/questions` | Retourne la liste des questions de cadrage (identiques pour tous les projets) |
 | POST | `/api/projects/{id}/cadrage` | Envoie les réponses de cadrage |
 | POST | `/api/projects/{id}/anonymize` | Envoie les paires d'anonymisation (ou liste vide si étape passée) |
 | POST | `/api/projects/{id}/generate` | Lance la génération en arrière-plan |

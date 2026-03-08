@@ -41,7 +41,7 @@ Les réponses générées servent deux objectifs :
 
 ### 2.1 Inclus dans la V1
 
-- Formats d'entrée : `.xlsx` et `.docx`
+- Formats d'entrée : `.xlsx` uniquement (wizard "Analyser un nouveau PAS")
 - Interface web basique sur `appsec.cc`
 - Questions de cadrage configurables (fichier texte)
 - Anonymisation par rechercher/remplacer (mots-clés fournis par l'utilisateur)
@@ -169,8 +169,8 @@ Les réponses générées servent deux objectifs :
 
 ### 6.1 Upload et parsing du questionnaire
 
-**F-PARSE-01 — Détection du format**
-L'outil détecte automatiquement le format du fichier uploadé (`.xlsx` ou `.docx`) par son extension.
+**F-PARSE-01 — Format d'entrée**
+Le wizard "Analyser un nouveau PAS" accepte uniquement les fichiers `.xlsx`. Le format `.docx` est supporté pour le corpus (wizard "Base de connaissances").
 
 **F-PARSE-02 — Extraction de la structure (xlsx)**
 Pour les fichiers `.xlsx` :
@@ -383,7 +383,7 @@ L'interface web sur `appsec.cc` propose deux onglets distincts :
 
 | # | Étape | Déclencheur backend |
 |---|---|---|
-| 1 | **Upload** — Déposer le fichier questionnaire (.xlsx ou .docx) | `POST /api/upload` |
+| 1 | **Upload** — Déposer le fichier questionnaire (.xlsx) | `POST /api/projects` |
 | 2 | **Anonymisation** — Saisir les paires mot réel → alias | `POST /api/projects/{id}/anonymize` |
 | 3 | **Structure** — Confirmer la structure détectée par Claude sur le fichier anonymisé | `POST /api/projects/{id}/detect-structure` + `POST /api/projects/{id}/structure` |
 | 4 | **Cadrage** — Répondre aux questions de cadrage une par une | *(à venir)* |
@@ -395,7 +395,7 @@ L'interface web sur `appsec.cc` propose deux onglets distincts :
 L'accès est protégé par SSO via le tenant M365 du FOURNISSEUR (OAuth2).
 
 **F-WEB-03 — Étape Upload**
-- Zone de dépôt (drag & drop) acceptant .xlsx et .docx, taille max 50 Mo.
+- Zone de dépôt (drag & drop) acceptant .xlsx, taille max 50 Mo.
 - Un bouton "Parcourir" en complément.
 - Affichage du nom du fichier sélectionné avant envoi.
 - Bouton "Envoyer" — déclenche la création du projet et l'analyse de structure par Claude.
@@ -430,8 +430,8 @@ L'accès est protégé par SSO via le tenant M365 du FOURNISSEUR (OAuth2).
 - Alias anonymisés préremplis avec des suggestions (CLIENT, MARCHE, PERSONNE_1…).
 - Bouton "Ajouter une ligne" pour ajouter une nouvelle paire.
 - Bouton "✕" sur chaque ligne pour la supprimer.
-- Cette étape est optionnelle : un bouton "Passer cette étape" permet de continuer sans anonymisation.
-- Bouton "Lancer le traitement" déclenche l'anonymisation puis la génération.
+- Cette étape est **obligatoire** : au moins un mot-clé doit être fourni avant de continuer.
+- Bouton "Anonymiser et continuer" déclenche l'anonymisation.
 
 **F-WEB-07 — Étape Génération (traitement en cours)**
 - Message "Traitement en cours…" avec un indicateur de progression animé.

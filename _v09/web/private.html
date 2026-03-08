@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS Assistant — Application</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* ---- Nav ---- */
+    .app-nav {
+      display: flex; gap: 0.5rem; margin-bottom: 2rem;
+      border-bottom: 2px solid #e0e0e0; padding-bottom: 0;
+    }
+    .nav-tab {
+      padding: 0.6rem 1.2rem; border: none; background: none;
+      font-size: 0.95rem; font-weight: 500; color: #666; cursor: pointer;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-tab:hover { color: #0078d4; }
+    .nav-tab.active { color: #0078d4; border-bottom-color: #0078d4; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ---- Forms ---- */
+    .section-label {
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #888; margin-bottom: 0.5rem;
+    }
+    .step-hint { font-size: 0.85rem; color: #888; margin-bottom: 1rem; }
+    .success-msg { color: #2e7d32; font-weight: 500; margin-bottom: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 0.3rem; }
+    .form-group input[type="text"],
+    .form-group input[type="date"],
+    .form-group input[type="number"],
+    .form-group select {
+      width: 100%; padding: 0.45rem 0.7rem; border: 1px solid #ccc;
+      border-radius: 5px; font-size: 0.9rem; font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #0078d4; }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .nav-btns { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }
+    .error-msg { color: #c0392b; margin-top: 0.75rem; min-height: 1.2em; font-size: 0.9rem; }
+    .deleted-label { color: #c0392b; font-style: italic; font-size: 0.85rem; }
+
+    /* ---- Keyword rows ---- */
+    .kw-rows { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.5rem 0 1rem; }
+    .kw-row { display: flex; align-items: center; gap: 0.5rem; }
+    .kw-row input[type="text"] {
+      flex: 1; padding: 0.4rem 0.6rem; border: 1px solid #ccc;
+      border-radius: 5px; font-size: 0.9rem; font-family: monospace;
+    }
+    .kw-row input[type="text"]:focus { outline: none; border-color: #0078d4; }
+    .kw-arrow { color: #888; flex-shrink: 0; }
+    .btn-icon {
+      background: none; border: none; cursor: pointer;
+      font-size: 1rem; color: #999; padding: 0 0.25rem; flex-shrink: 0;
+    }
+    .btn-icon:hover { color: #c0392b; }
+    .btn-add { font-size: 0.85rem; margin-bottom: 1rem; }
+
+    /* ---- Mapping table ---- */
+    .mapping-table {
+      width: 100%; border-collapse: collapse;
+      margin: 1rem 0 1.5rem; font-size: 0.9rem; text-align: left;
+    }
+    .mapping-table th {
+      background: #f0f4ff; padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid #d0d8f0; font-weight: 600;
+    }
+    .mapping-table td {
+      padding: 0.4rem 0.75rem; border-bottom: 1px solid #eee; font-family: monospace;
+    }
+    .mapping-table tr:last-child td { border-bottom: none; }
+
+    /* ---- Wizard ---- */
+    .wiz-question {
+      font-size: 1rem; font-weight: 500; color: #1a1a2e;
+      margin-bottom: 1.25rem; line-height: 1.5;
+    }
+    .wiz-options { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.25rem; }
+    .wiz-option {
+      display: flex; align-items: center; gap: 0.6rem; cursor: pointer;
+      padding: 0.5rem 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .wiz-option:hover { background: #f5f8ff; border-color: #b0c8f0; }
+    .wiz-option input { cursor: pointer; accent-color: #0078d4; }
+    .wiz-input {
+      width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ccc;
+      border-radius: 5px; font-size: 0.95rem; font-family: inherit;
+      resize: vertical; margin-bottom: 1.25rem;
+    }
+    .wiz-input:focus { outline: none; border-color: #0078d4; }
+    .wiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; }
+    .wiz-error { min-height: 1.2em; color: #c0392b; font-size: 0.9rem; margin-top: 0.5rem; }
+
+    /* ---- Structure form ---- */
+    .struct-badge {
+      display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px;
+      font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem;
+    }
+    .struct-badge.high { background: #e8f5e9; color: #2e7d32; }
+    .struct-badge.medium { background: #fff3e0; color: #e65100; }
+    .struct-badge.low { background: #fce4ec; color: #c62828; }
+    .struct-col-input {
+      width: 100%; padding: 0.45rem 0.7rem; border: 1px solid #ccc;
+      border-radius: 5px; font-size: 0.9rem; font-family: monospace;
+      text-transform: uppercase;
+    }
+    .struct-col-input:focus { outline: none; border-color: #0078d4; }
+
+    /* ---- Spinner ---- */
+    .spinner {
+      display: inline-block; width: 1.2rem; height: 1.2rem;
+      border: 3px solid #e0e0e0; border-top-color: #0078d4;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Corpus list ---- */
+    .corpus-list { margin-top: 1.5rem; }
+    .corpus-list-title {
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #888; margin-bottom: 0.75rem;
+    }
+    .corpus-entry {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      border: 1px solid #e0e0e0; border-radius: 6px;
+      padding: 0.75rem 1rem; margin-bottom: 0.5rem;
+    }
+    .corpus-entry-body { flex: 1; }
+    .corpus-entry-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.2rem; }
+    .corpus-entry-meta { color: #888; font-size: 0.82rem; }
+    .corpus-entry-delete {
+      background: none; border: none; cursor: pointer;
+      color: #ccc; font-size: 1rem; padding: 0 0.25rem; flex-shrink: 0;
+    }
+    .corpus-entry-delete:hover { color: #c0392b; }
+    .corpus-empty { color: #aaa; font-size: 0.9rem; font-style: italic; }
+    .corpus-separator { border: none; border-top: 1px solid #e0e0e0; margin: 2rem 0 1.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <span id="user-info"></span>
+    <a href="/auth/logout" class="btn btn-small">Se déconnecter</a>
+  </header>
+  <main style="max-width:700px; text-align:left;">
+    <h1 style="margin-bottom:1.5rem;">PAS Assistant</h1>
+
+    <nav class="app-nav">
+      <button class="nav-tab active" onclick="switchTab('pas')">Analyser un nouveau PAS</button>
+      <button class="nav-tab" onclick="switchTab('corpus')">Base de connaissances</button>
+    </nav>
+
+    <!-- ================================================================ -->
+    <!-- TAB : PAS                                                         -->
+    <!-- ================================================================ -->
+    <div id="tab-pas" class="tab-panel active">
+
+      <!-- 1. Upload -->
+      <div id="pas-upload-section">
+        <p>Sélectionnez votre questionnaire (.xlsx) pour commencer.</p>
+        <input type="file" id="pas-file-input" accept=".xlsx">
+        <br><br>
+        <button id="pas-upload-btn" class="btn btn-primary" onclick="pasUploadFile()">Envoyer</button>
+        <p class="error-msg" id="pas-upload-error"></p>
+      </div>
+
+      <!-- 2. Anonymisation -->
+      <div id="pas-anon-section" style="display:none;">
+        <p class="step-hint">Etape 1 / 3 — Définir les mots-clés à anonymiser</p>
+        <div id="pas-anon-loading"><p style="color:#888;">Analyse des métadonnées du fichier…</p></div>
+        <div id="pas-anon-ready" style="display:none;">
+          <p class="section-label">Mots-clés à anonymiser</p>
+          <p class="step-hint" style="margin-top:0;">Pour chaque ligne : mot-clé original → remplacement dans le fichier.</p>
+          <div id="pas-kw-rows" class="kw-rows"></div>
+          <button class="btn btn-small btn-add" onclick="addKwRow('pas-kw-rows','','')">+ Ajouter une ligne</button>
+          <button id="pas-anon-btn" class="btn btn-primary" onclick="pasDoAnonymize()">Anonymiser →</button>
+          <p class="error-msg" id="pas-anon-error"></p>
+        </div>
+      </div>
+
+      <!-- 3. Structure -->
+      <div id="pas-structure-section" style="display:none;">
+        <p class="step-hint">Etape 2 / 3 — Vérifier la structure détectée par Claude</p>
+        <div id="pas-struct-loading">
+          <span class="spinner"></span> Analyse de la structure en cours…
+        </div>
+        <div id="pas-struct-form" style="display:none;"></div>
+        <p class="error-msg" id="pas-struct-error"></p>
+      </div>
+
+      <!-- 4. Résultat -->
+      <div id="pas-done-section" style="display:none;">
+        <p class="success-msg">Anonymisation et analyse de structure terminées.</p>
+        <p class="section-label">Fichier anonymisé</p>
+        <a id="pas-download-link" class="btn btn-primary" href="#" style="margin-bottom:1.5rem;display:inline-block;">
+          Télécharger anonymized.xlsx
+        </a>
+        <p class="section-label" style="margin-top:1rem;">Mots-clés remplacés</p>
+        <table class="mapping-table">
+          <thead><tr><th>Mot-clé original</th><th>Remplacement</th></tr></thead>
+          <tbody id="pas-mapping-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB : CORPUS                                                      -->
+    <!-- ================================================================ -->
+    <div id="tab-corpus" class="tab-panel">
+
+      <!-- 1. Upload -->
+      <div id="corpus-upload-section">
+        <p>Uploadez un questionnaire de sécurité <strong>déjà rempli</strong> pour enrichir la base de connaissances du LLM.</p>
+        <div class="form-group">
+          <input type="file" id="corpus-file-input" accept=".xlsx,.docx">
+        </div>
+        <button id="corpus-upload-btn" class="btn btn-primary" onclick="corpusUploadFile()">Envoyer</button>
+        <p class="error-msg" id="corpus-upload-error"></p>
+      </div>
+
+      <!-- 2. Wizard (cadrage) -->
+      <div id="corpus-wizard-section" style="display:none;">
+        <p class="step-hint">Etape 1 / 5 — Contexte de la prestation</p>
+        <div id="corpus-wizard-container"></div>
+      </div>
+
+      <!-- 3. Anonymisation -->
+      <div id="corpus-anon-section" style="display:none;">
+        <p class="step-hint">Etape 2 / 5 — Anonymiser avant envoi à Claude</p>
+        <div id="corpus-anon-loading"><p style="color:#888;">Analyse des métadonnées du fichier…</p></div>
+        <div id="corpus-anon-ready" style="display:none;">
+          <p class="section-label">Mots-clés à anonymiser</p>
+          <p class="step-hint" style="margin-top:0;">Pour chaque ligne : mot-clé original → remplacement dans le fichier.</p>
+          <div id="corpus-anon-rows" class="kw-rows"></div>
+          <button class="btn btn-small btn-add" onclick="addKwRow('corpus-anon-rows','','')">+ Ajouter une ligne</button>
+          <div class="nav-btns">
+            <button class="btn" onclick="corpusShowSection('corpus-wizard-section'); corpusWizard.restart()">← Précédent</button>
+            <button id="corpus-anon-btn" class="btn btn-primary" onclick="corpusDoAnonymize()">Anonymiser →</button>
+          </div>
+          <p class="error-msg" id="corpus-anon-error"></p>
+        </div>
+      </div>
+
+      <!-- 4. Structure -->
+      <div id="corpus-structure-section" style="display:none;">
+        <p class="step-hint">Etape 3 / 5 — Vérifier la structure détectée par Claude</p>
+        <div id="corpus-struct-loading">
+          <span class="spinner"></span> Analyse de la structure en cours…
+        </div>
+        <div id="corpus-struct-form" style="display:none;"></div>
+        <p class="error-msg" id="corpus-struct-error"></p>
+      </div>
+
+      <!-- 5. Infos complémentaires -->
+      <div id="corpus-extra-section" style="display:none;">
+        <p class="step-hint">Etape 4 / 5 — Informations complémentaires</p>
+        <div class="form-group">
+          <label>Date de remplissage</label>
+          <input type="date" id="corpus-date">
+        </div>
+        <div class="form-group">
+          <label>Tags libres <span style="font-weight:400;color:#888;">(séparés par des virgules)</span></label>
+          <input type="text" id="corpus-tags" placeholder="ex : cloud, OCI, militaire, NDA">
+        </div>
+        <div class="nav-btns">
+          <button class="btn" id="corpus-extra-back-btn">← Précédent</button>
+          <button id="corpus-save-btn" class="btn btn-primary" onclick="corpusSaveMetadata()">Enregistrer dans le corpus</button>
+        </div>
+        <p class="error-msg" id="corpus-save-error"></p>
+      </div>
+
+      <!-- 6. Done -->
+      <div id="corpus-done-section" style="display:none;">
+        <p class="success-msg">Questionnaire ajouté à la base de connaissances.</p>
+        <button class="btn btn-primary" onclick="corpusReset()">Ajouter un autre fichier</button>
+      </div>
+
+      <!-- Liste corpus (persistante) -->
+      <hr class="corpus-separator">
+      <div class="corpus-list">
+        <p class="corpus-list-title">Base de connaissances (<span id="corpus-count">0</span> fichier(s))</p>
+        <div id="corpus-entries"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // Utilities
+    // =========================================================================
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    }
+
+    // =========================================================================
+    // Navigation
+    // =========================================================================
+
+    function switchTab(name) {
+      document.querySelectorAll('.nav-tab').forEach((btn, i) => {
+        btn.classList.toggle('active', ['pas','corpus'][i] === name);
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        p.classList.toggle('active', p.id === 'tab-' + name);
+      });
+      if (name === 'corpus') loadCorpusList();
+    }
+
+    // =========================================================================
+    // Auth
+    // =========================================================================
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) { window.location.href = '/'; return; }
+        const user = await res.json();
+        document.getElementById('user-info').textContent = `${user.name} (${user.email})`;
+      } catch { window.location.href = '/'; }
+    }
+
+    // =========================================================================
+    // Shared — keyword rows
+    // =========================================================================
+
+    function addKwRow(containerId, original, replacement) {
+      const container = document.getElementById(containerId);
+      const row = document.createElement('div');
+      row.className = 'kw-row';
+      row.innerHTML =
+        `<input type="text" class="kw-original" placeholder="Mot-clé original" value="${escAttr(original)}">` +
+        `<span class="kw-arrow">→</span>` +
+        `<input type="text" class="kw-replacement" placeholder="Remplacement" value="${escAttr(replacement)}">` +
+        `<button class="btn-icon" title="Supprimer" onclick="this.closest('.kw-row').remove()">&#x1F5D1;</button>`;
+      container.appendChild(row);
+    }
+
+    function getKwPairs(containerId) {
+      const pairs = [];
+      document.querySelectorAll(`#${containerId} .kw-row`).forEach(row => {
+        const o = row.querySelector('.kw-original').value.trim();
+        const r = row.querySelector('.kw-replacement').value.trim();
+        if (o && r) pairs.push({ original: o, replacement: r });
+      });
+      return pairs;
+    }
+
+    // =========================================================================
+    // Shared — structure form
+    // =========================================================================
+
+    function renderStructureForm(formContainerId, data, onConfirm, onBack) {
+      const el = document.getElementById(formContainerId);
+      const conf = data.confidence || 'low';
+      const confLabel = { high: 'Confiance élevée', medium: 'Confiance moyenne', low: 'Confiance faible' }[conf];
+      const sheetOptions = (data.all_sheets || [data.selected_sheet]).filter(Boolean)
+        .map(s => `<option value="${escAttr(s)}"${s === data.selected_sheet ? ' selected' : ''}>${escHtml(s)}</option>`)
+        .join('');
+
+      el.innerHTML = `
+        <span class="struct-badge ${conf}">${escHtml(confLabel)}</span>
+        ${conf !== 'high' ? `<p class="step-hint" style="color:#e65100;margin-top:0;">Vérifiez attentivement les champs ci-dessous.</p>` : ''}
+        ${data.notes ? `<p class="step-hint" style="margin-top:0;font-style:italic;">${escHtml(data.notes)}</p>` : ''}
+
+        <div class="form-group">
+          <label>Onglet principal</label>
+          <select id="sf-sheet">${sheetOptions}</select>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Ligne d'en-tête</label>
+            <input type="number" id="sf-header-row" min="1" value="${data.header_row || 1}">
+          </div>
+          <div class="form-group">
+            <label>1ère ligne de données</label>
+            <input type="number" id="sf-first-data-row" min="1" value="${data.first_data_row || 2}">
+          </div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Colonne ID question <span style="font-weight:400;color:#888;">(optionnel)</span></label>
+            <input type="text" class="struct-col-input" id="sf-col-id" placeholder="ex: A" value="${data.col_id || ''}">
+          </div>
+          <div class="form-group">
+            <label>Colonne question / exigence</label>
+            <input type="text" class="struct-col-input" id="sf-col-question" placeholder="ex: C" value="${data.col_question || ''}">
+          </div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Colonne réponse</label>
+            <input type="text" class="struct-col-input" id="sf-col-response" placeholder="ex: E" value="${data.col_response || ''}">
+          </div>
+          <div class="form-group">
+            <label>Colonne statut <span style="font-weight:400;color:#888;">(optionnel)</span></label>
+            <input type="text" class="struct-col-input" id="sf-col-status" placeholder="ex: F ou vide" value="${data.col_status || ''}">
+          </div>
+        </div>
+        <div class="nav-btns">
+          <button class="btn sf-back-btn">← Précédent</button>
+          <button class="btn btn-primary sf-confirm-btn">Confirmer →</button>
+        </div>
+      `;
+
+      el.querySelector('.sf-confirm-btn').addEventListener('click', () => {
+        const colQuestion = el.querySelector('#sf-col-question').value.trim().toUpperCase();
+        const colResponse = el.querySelector('#sf-col-response').value.trim().toUpperCase();
+        if (!colQuestion) { alert('La colonne question est obligatoire.'); return; }
+        if (!colResponse) { alert('La colonne réponse est obligatoire.'); return; }
+        onConfirm({
+          selected_sheet: el.querySelector('#sf-sheet').value,
+          header_row: parseInt(el.querySelector('#sf-header-row').value) || 1,
+          first_data_row: parseInt(el.querySelector('#sf-first-data-row').value) || 2,
+          col_id: el.querySelector('#sf-col-id').value.trim().toUpperCase() || null,
+          col_question: colQuestion,
+          col_response: colResponse,
+          col_status: el.querySelector('#sf-col-status').value.trim().toUpperCase() || null,
+        });
+      });
+      el.querySelector('.sf-back-btn').addEventListener('click', onBack);
+      el.style.display = '';
+    }
+
+    async function runStructureDetection({ detectUrl, saveUrl, loadingId, formId, errorId, onConfirm, onBack }) {
+      document.getElementById(loadingId).style.display = '';
+      document.getElementById(formId).style.display = 'none';
+      document.getElementById(errorId).textContent = '';
+
+      let data;
+      try {
+        const res = await fetch(detectUrl, { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json();
+          // Non-blocking: show form empty so user can fill manually
+          data = { all_sheets: [], confidence: 'low', notes: err.detail || 'Détection automatique indisponible.' };
+        } else {
+          data = await res.json();
+        }
+      } catch {
+        data = { all_sheets: [], confidence: 'low', notes: 'Erreur réseau — remplissez manuellement.' };
+      }
+
+      document.getElementById(loadingId).style.display = 'none';
+
+      // If format is not xlsx, skip with a message
+      if (data.skipped) {
+        document.getElementById(errorId).textContent = '';
+        onConfirm(null); // null = no structure to save
+        return;
+      }
+
+      renderStructureForm(
+        formId, data,
+        async (structure) => {
+          try {
+            await fetch(saveUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(structure),
+            });
+          } catch { /* non-blocking */ }
+          onConfirm(structure);
+        },
+        onBack,
+      );
+    }
+
+    // =========================================================================
+    // QuestionWizard — shared class
+    // =========================================================================
+
+    class QuestionWizard {
+      constructor({ container, questions, onComplete }) {
+        this.container = container;
+        this.questions = questions;
+        this.onComplete = onComplete;
+        this.answers = {};
+        this.stack = [];
+      }
+
+      start() { this.answers = {}; this.stack = []; this._advance(0); }
+
+      restart() {
+        const last = this.stack[this.stack.length - 1];
+        if (last !== undefined) this._render(last);
+        else this.start();
+      }
+
+      _evalCondition(idx) {
+        const q = this.questions[idx];
+        if (!q.condition || idx === 0) return true;
+        const prevKey = this.questions[idx - 1].key;
+        const prevAns = this.answers[prevKey];
+        const cond = q.condition;
+        const eqM = cond.match(/^previous\s*==\s*"([^"]+)"$/i);
+        if (eqM) return String(prevAns ?? '') === eqM[1];
+        const containsM = cond.match(/^previous\s+contains\s+"([^"]+)"$/i);
+        if (containsM) {
+          if (Array.isArray(prevAns)) return prevAns.includes(containsM[1]);
+          return String(prevAns ?? '').includes(containsM[1]);
+        }
+        return true;
+      }
+
+      _advance(fromIdx) {
+        for (let i = fromIdx; i < this.questions.length; i++) {
+          if (this._evalCondition(i)) { this.stack.push(i); this._render(i); return; }
+        }
+        this.onComplete({ ...this.answers });
+      }
+
+      _back() {
+        this.stack.pop();
+        const prev = this.stack.pop();
+        if (prev === undefined) { this.start(); return; }
+        this.stack.push(prev); this._render(prev);
+      }
+
+      _next(idx) {
+        const q = this.questions[idx];
+        const errEl = this.container.querySelector('.wiz-error');
+        let answer;
+        if (q.options && q.multi) {
+          const checked = [...this.container.querySelectorAll('input[type="checkbox"]:checked')].map(c => c.value);
+          if (!checked.length) { errEl.textContent = 'Sélectionnez au moins une option.'; return; }
+          answer = checked;
+        } else if (q.options) {
+          const rb = this.container.querySelector('input[type="radio"]:checked');
+          if (!rb) { errEl.textContent = 'Sélectionnez une option.'; return; }
+          answer = rb.value;
+        } else {
+          const inp = this.container.querySelector('.wiz-input');
+          answer = inp ? inp.value.trim() : '';
+        }
+        this.answers[q.key] = answer;
+        // If this question has skip_all_if and the answer matches, end the wizard immediately
+        if (q.skip_all_if && answer === q.skip_all_if) {
+          this.onComplete({ ...this.answers });
+          return;
+        }
+        this._advance(idx + 1);
+      }
+
+      _isLast(idx) {
+        for (let i = idx + 1; i < this.questions.length; i++) {
+          if (!this.questions[i].condition) return false;
+        }
+        return true;
+      }
+
+      _countVisible() {
+        let n = 0;
+        for (let i = 0; i < this.questions.length; i++) if (this._evalCondition(i)) n++;
+        return n;
+      }
+
+      _render(idx) {
+        const q = this.questions[idx];
+        const pos = this.stack.length;
+        const total = this._countVisible();
+        const existing = this.answers[q.key];
+        let inputHtml = '';
+        // Use saved answer, or default value, or nothing
+        const effectiveValue = existing !== undefined ? existing : (q.default ?? undefined);
+        if (q.options && q.multi) {
+          inputHtml = '<div class="wiz-options">' + q.options.map(opt => {
+            const chk = Array.isArray(effectiveValue) && effectiveValue.includes(opt) ? ' checked' : '';
+            return `<label class="wiz-option"><input type="checkbox" value="${escAttr(opt)}"${chk}> ${escHtml(opt)}</label>`;
+          }).join('') + '</div>';
+        } else if (q.options) {
+          inputHtml = '<div class="wiz-options">' + q.options.map(opt => {
+            const chk = effectiveValue === opt ? ' checked' : '';
+            return `<label class="wiz-option"><input type="radio" name="wiz-radio-${idx}" value="${escAttr(opt)}"${chk}> ${escHtml(opt)}</label>`;
+          }).join('') + '</div>';
+        } else if (q.type === 'number') {
+          inputHtml = `<input type="number" class="wiz-input" min="0" step="1" value="${effectiveValue !== undefined ? escAttr(String(effectiveValue)) : ''}">`;
+        } else {
+          inputHtml = `<textarea class="wiz-input" rows="3">${effectiveValue !== undefined ? escHtml(String(effectiveValue)) : ''}</textarea>`;
+        }
+        this.container.innerHTML =
+          `<p class="step-hint">Question ${pos} / ~${total}</p>` +
+          `<p class="wiz-question">${escHtml(q.text)}</p>` +
+          `<div>${inputHtml}</div>` +
+          `<div class="wiz-nav">` +
+            `<button class="btn wiz-prev-btn"${this.stack.length <= 1 ? ' style="visibility:hidden"' : ''}>← Précédent</button>` +
+            `<button class="btn btn-primary wiz-next-btn">${this._isLast(idx) ? 'Valider ✓' : 'Suivant →'}</button>` +
+          `</div><p class="wiz-error"></p>`;
+        this.container.querySelector('.wiz-next-btn').addEventListener('click', () => this._next(idx));
+        this.container.querySelector('.wiz-prev-btn').addEventListener('click', () => this._back());
+      }
+    }
+
+    // =========================================================================
+    // PAS tab
+    // =========================================================================
+
+    let _pasProjectId = null;
+
+    function pasShowSection(id) {
+      ['pas-upload-section','pas-anon-section','pas-structure-section','pas-done-section']
+        .forEach(s => { document.getElementById(s).style.display = s === id ? '' : 'none'; });
+    }
+
+    async function pasUploadFile() {
+      const fileInput = document.getElementById('pas-file-input');
+      const btn = document.getElementById('pas-upload-btn');
+      document.getElementById('pas-upload-error').textContent = '';
+      if (!fileInput.files.length) { document.getElementById('pas-upload-error').textContent = 'Veuillez sélectionner un fichier.'; return; }
+      btn.disabled = true; btn.textContent = 'Envoi en cours…';
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      try {
+        const res = await fetch('/api/projects', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const err = await res.json();
+          document.getElementById('pas-upload-error').textContent = err.detail || "Erreur lors de l'envoi.";
+          btn.disabled = false; btn.textContent = 'Envoyer'; return;
+        }
+        const data = await res.json();
+        _pasProjectId = data.project_id;
+        pasShowSection('pas-anon-section');
+        pasLoadAnonSuggestions();
+      } catch {
+        document.getElementById('pas-upload-error').textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Envoyer';
+      }
+    }
+
+    async function pasLoadAnonSuggestions() {
+      document.getElementById('pas-anon-loading').style.display = '';
+      document.getElementById('pas-anon-ready').style.display = 'none';
+      document.getElementById('pas-kw-rows').innerHTML = '';
+      try {
+        const res = await fetch(`/api/projects/${_pasProjectId}/metadata`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        (data.suggestions || []).forEach(v => addKwRow('pas-kw-rows', v, ''));
+      } catch {}
+      if (!document.getElementById('pas-kw-rows').children.length) addKwRow('pas-kw-rows','','');
+      document.getElementById('pas-anon-loading').style.display = 'none';
+      document.getElementById('pas-anon-ready').style.display = '';
+    }
+
+    async function pasDoAnonymize() {
+      const btn = document.getElementById('pas-anon-btn');
+      document.getElementById('pas-anon-error').textContent = '';
+      const keywords = getKwPairs('pas-kw-rows');
+      if (!keywords.length) { document.getElementById('pas-anon-error').textContent = 'Ajoutez au moins une paire mot-clé / remplacement.'; return; }
+      btn.disabled = true; btn.textContent = 'Anonymisation en cours…';
+      try {
+        const res = await fetch(`/api/projects/${_pasProjectId}/anonymize`, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ keywords }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          document.getElementById('pas-anon-error').textContent = err.detail || "Erreur.";
+          btn.disabled = false; btn.textContent = 'Anonymiser →'; return;
+        }
+        const data = await res.json();
+        _pasAnonMapping = data.mapping;
+        _pasDownloadUrl = data.download_url;
+        pasShowSection('pas-structure-section');
+        pasDetectStructure();
+      } catch {
+        document.getElementById('pas-anon-error').textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Anonymiser →';
+      }
+    }
+
+    let _pasAnonMapping = {};
+    let _pasDownloadUrl = '';
+
+    async function pasDetectStructure() {
+      await runStructureDetection({
+        detectUrl: `/api/projects/${_pasProjectId}/detect-structure`,
+        saveUrl: `/api/projects/${_pasProjectId}/structure`,
+        loadingId: 'pas-struct-loading',
+        formId: 'pas-struct-form',
+        errorId: 'pas-struct-error',
+        onConfirm: () => {
+          pasShowSection('pas-done-section');
+          document.getElementById('pas-download-link').href = _pasDownloadUrl;
+          const tbody = document.getElementById('pas-mapping-tbody');
+          tbody.innerHTML = '';
+          Object.entries(_pasAnonMapping || {}).forEach(([kw, repl]) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${escHtml(kw)}</td><td>${repl === '' ? '<span class="deleted-label">supprimé</span>' : escHtml(repl)}</td>`;
+            tbody.appendChild(tr);
+          });
+        },
+        onBack: () => {
+          pasShowSection('pas-anon-section');
+          const btn = document.getElementById('pas-anon-btn');
+          btn.disabled = false; btn.textContent = 'Anonymiser →';
+        },
+      });
+    }
+
+    // =========================================================================
+    // Corpus tab
+    // =========================================================================
+
+    let _corpusId = null;
+    let _corpusWizardAnswers = {};
+    let corpusWizard = null;
+    let _corpusFormat = 'xlsx';
+
+    function corpusShowSection(id) {
+      ['corpus-upload-section','corpus-wizard-section','corpus-anon-section',
+       'corpus-structure-section','corpus-extra-section','corpus-done-section']
+        .forEach(s => { document.getElementById(s).style.display = s === id ? '' : 'none'; });
+    }
+
+    async function corpusUploadFile() {
+      const fileInput = document.getElementById('corpus-file-input');
+      const btn = document.getElementById('corpus-upload-btn');
+      document.getElementById('corpus-upload-error').textContent = '';
+      if (!fileInput.files.length) { document.getElementById('corpus-upload-error').textContent = 'Veuillez sélectionner un fichier.'; return; }
+      btn.disabled = true; btn.textContent = 'Envoi en cours…';
+      const fd = new FormData(); fd.append('file', fileInput.files[0]);
+      try {
+        const res = await fetch('/api/corpus', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const err = await res.json();
+          document.getElementById('corpus-upload-error').textContent = err.detail || "Erreur.";
+          btn.disabled = false; btn.textContent = 'Envoyer'; return;
+        }
+        const data = await res.json();
+        _corpusId = data.corpus_id;
+        _corpusFormat = fileInput.files[0].name.split('.').pop().toLowerCase();
+
+        const qRes = await fetch('/api/questions');
+        const qData = await qRes.json();
+        corpusWizard = new QuestionWizard({
+          container: document.getElementById('corpus-wizard-container'),
+          questions: qData.questions,
+          onComplete: (answers) => {
+            _corpusWizardAnswers = answers;
+            corpusShowSection('corpus-anon-section');
+            corpusLoadAnonSuggestions();
+          },
+        });
+        corpusWizard.start();
+        corpusShowSection('corpus-wizard-section');
+      } catch {
+        document.getElementById('corpus-upload-error').textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Envoyer';
+      }
+    }
+
+    async function corpusLoadAnonSuggestions() {
+      document.getElementById('corpus-anon-loading').style.display = '';
+      document.getElementById('corpus-anon-ready').style.display = 'none';
+      document.getElementById('corpus-anon-rows').innerHTML = '';
+      try {
+        const res = await fetch(`/api/corpus/${_corpusId}/anon-suggestions`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        (data.suggestions || []).forEach(v => addKwRow('corpus-anon-rows', v, ''));
+      } catch {}
+      if (!document.getElementById('corpus-anon-rows').children.length) addKwRow('corpus-anon-rows','','');
+      document.getElementById('corpus-anon-loading').style.display = 'none';
+      document.getElementById('corpus-anon-ready').style.display = '';
+    }
+
+    async function corpusDoAnonymize() {
+      const btn = document.getElementById('corpus-anon-btn');
+      document.getElementById('corpus-anon-error').textContent = '';
+      const keywords = getKwPairs('corpus-anon-rows');
+      if (!keywords.length) { document.getElementById('corpus-anon-error').textContent = 'Ajoutez au moins une paire.'; return; }
+      btn.disabled = true; btn.textContent = 'Anonymisation en cours…';
+      try {
+        const res = await fetch(`/api/corpus/${_corpusId}/anonymize`, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ keywords }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          document.getElementById('corpus-anon-error').textContent = err.detail || 'Erreur.';
+          btn.disabled = false; btn.textContent = 'Anonymiser →'; return;
+        }
+        corpusShowSection('corpus-structure-section');
+        corpusDetectStructure();
+      } catch {
+        document.getElementById('corpus-anon-error').textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Anonymiser →';
+      }
+    }
+
+    async function corpusDetectStructure() {
+      // "← Précédent" from extra section goes back here or to anon depending on format
+      document.getElementById('corpus-extra-back-btn').onclick = () => {
+        if (_corpusFormat === 'xlsx') {
+          corpusShowSection('corpus-structure-section');
+        } else {
+          corpusShowSection('corpus-anon-section');
+        }
+      };
+
+      await runStructureDetection({
+        detectUrl: `/api/corpus/${_corpusId}/detect-structure`,
+        saveUrl: `/api/corpus/${_corpusId}/structure`,
+        loadingId: 'corpus-struct-loading',
+        formId: 'corpus-struct-form',
+        errorId: 'corpus-struct-error',
+        onConfirm: () => corpusShowSection('corpus-extra-section'),
+        onBack: () => {
+          corpusShowSection('corpus-anon-section');
+          const btn = document.getElementById('corpus-anon-btn');
+          btn.disabled = false; btn.textContent = 'Anonymiser →';
+        },
+      });
+    }
+
+    async function corpusSaveMetadata() {
+      const btn = document.getElementById('corpus-save-btn');
+      document.getElementById('corpus-save-error').textContent = '';
+      btn.disabled = true; btn.textContent = 'Enregistrement…';
+      const date = document.getElementById('corpus-date').value;
+      const tagsRaw = document.getElementById('corpus-tags').value;
+      const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+      try {
+        const res = await fetch(`/api/corpus/${_corpusId}/metadata`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ answers: _corpusWizardAnswers, date_remplissage: date, tags }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          document.getElementById('corpus-save-error').textContent = err.detail || 'Erreur.';
+          btn.disabled = false; btn.textContent = 'Enregistrer dans le corpus'; return;
+        }
+        corpusShowSection('corpus-done-section');
+        loadCorpusList();
+      } catch {
+        document.getElementById('corpus-save-error').textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Enregistrer dans le corpus';
+      }
+    }
+
+    function corpusReset() {
+      _corpusId = null; _corpusWizardAnswers = {}; corpusWizard = null;
+      document.getElementById('corpus-file-input').value = '';
+      document.getElementById('corpus-date').value = '';
+      document.getElementById('corpus-tags').value = '';
+      document.getElementById('corpus-anon-rows').innerHTML = '';
+      document.getElementById('corpus-struct-form').innerHTML = '';
+      document.getElementById('corpus-struct-form').style.display = 'none';
+      document.getElementById('corpus-struct-loading').style.display = '';
+      ['corpus-upload-btn','corpus-anon-btn','corpus-save-btn'].forEach(id => {
+        const b = document.getElementById(id); b.disabled = false;
+        b.textContent = { 'corpus-upload-btn':'Envoyer', 'corpus-anon-btn':'Anonymiser →', 'corpus-save-btn':'Enregistrer dans le corpus' }[id];
+      });
+      corpusShowSection('corpus-upload-section');
+    }
+
+    async function loadCorpusList() {
+      try {
+        const res = await fetch('/api/corpus');
+        const data = await res.json();
+        const entries = data.entries || [];
+        document.getElementById('corpus-count').textContent = entries.length;
+        const container = document.getElementById('corpus-entries');
+        if (!entries.length) {
+          container.innerHTML = '<p class="corpus-empty">Aucun fichier dans la base de connaissances.</p>';
+          return;
+        }
+        container.innerHTML = entries.map(e => {
+          const meta = [e.type_prestation, e.secteur_client, e.nb_etp ? `${e.nb_etp} ETP` : null, e.date_remplissage || null]
+            .filter(Boolean).join(' · ');
+          return `<div class="corpus-entry">` +
+            `<div class="corpus-entry-body">` +
+              `<div class="corpus-entry-title">${escHtml(e.filename || e.corpus_id)}</div>` +
+              `<div class="corpus-entry-meta">${escHtml(meta)}</div>` +
+            `</div>` +
+            `<button class="corpus-entry-delete" onclick="deleteCorpusEntry('${escAttr(e.corpus_id)}')">&#x1F5D1;</button>` +
+          `</div>`;
+        }).join('');
+      } catch {
+        document.getElementById('corpus-entries').innerHTML = '<p style="color:#c0392b;">Erreur lors du chargement.</p>';
+      }
+    }
+
+    async function deleteCorpusEntry(id) {
+      if (!confirm('Supprimer ce fichier du corpus ?')) return;
+      try { await fetch(`/api/corpus/${id}`, { method: 'DELETE' }); loadCorpusList(); }
+      catch { alert('Erreur lors de la suppression.'); }
+    }
+
+    // =========================================================================
+    // Init
+    // =========================================================================
+
+    checkAuth();
+  </script>
+</body>
+</html>
