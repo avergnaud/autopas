@@ -1,0 +1,59 @@
++ PAS niveau entreprise (questions générales)
+  OPTIONS: Non, Oui
+  DEFAULT: Non
+  KEY: pas_niveau_entreprise
+  SKIP_ALL_IF: Oui
+
++ Est-ce que l'Appel d'Offre porte sur de l'Assistance Technique ou un dispositif à engagement ?
+  OPTIONS: Assistance Technique, Dispositif à engagement
+  KEY: type_prestation_base
+
++ IF previous == "Dispositif à engagement": Si l'Appel d'Offre porte sur un dispositif à engagement, est-ce un CDR, CDC, CDS ?
+  OPTIONS: CDR, CDC, CDS
+  KEY: type_prestation_detail
+
++ Est-ce que la Prestation inclut des activités de développement, ou plutôt de l'analyse métier, du test, de la configuration ?
+  TYPE: text
+  KEY: activites
+
++ Est-ce que la Prestation fait partie du centre d'expertise Atlassian ?
+  OPTIONS: Oui, Non
+  KEY: expertise_atlassian
+
++ Sur le périmètre de la Prestation, est-ce que les données CLIENT seront hébergées par le SI du CLIENT, par FOURNISSEUR, ou par une solution Cloud ?
+  OPTIONS: SI CLIENT, FOURNISSEUR, Cloud
+  KEY: hebergement_donnees
+
++ IF previous == "Cloud": Quel est le nom du fournisseur Cloud ?
+  TYPE: text
+  KEY: cloud_provider
+
++ Est-ce que le FOURNISSEUR est sous-traitant pour au-moins un traitement de données personnelles au sens RGPD ?
+  OPTIONS: Oui, Non
+  KEY: sous_traitance_rgpd
+
++ Est-ce que les collaborateurs travailleront sur site CLIENT, en agence FOURNISSEUR, en télétravail ?
+  OPTIONS: Site CLIENT, Agence FOURNISSEUR, Télétravail
+  MULTI: true
+  KEY: lieu_travail
+
++ IF previous contains "Agence FOURNISSEUR": Si les collaborateurs travaillent en agence FOURNISSEUR, depuis quelles agences exactement ?
+  TYPE: text
+  KEY: agences
+
++ Est-ce que les collaborateurs utilisent des postes de travail CLIENT ou FOURNISSEUR ?
+  OPTIONS: CLIENT, FOURNISSEUR
+  KEY: poste_travail
+
++ IF previous == "FOURNISSEUR": Par quel moyen les collaborateurs se connectent à distance au SI CLIENT ?
+  TYPE: text
+  KEY: connexion_distante
+
++ Quel est le secteur du CLIENT ?
+  OPTIONS: Public, Privé
+  KEY: secteur_client
+
++ Niveau de verbosité des réponses générées
+  OPTIONS: Concis, Standard, Détaillé
+  DEFAULT: Standard
+  KEY: verbosity
