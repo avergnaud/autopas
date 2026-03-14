@@ -1,0 +1,48 @@
+# PAS Assistant — Configuration générale
+
+# API Claude
+claude:
+  api_key_env: "ANTHROPIC_API_KEY"
+  model: "claude-sonnet-4-6"
+  max_tokens: 16000
+  temperature: 0.3
+
+# Verbosité des réponses générées
+verbosity:
+  default_level: 2
+  levels:
+    1:
+      label: "Concis"
+      max_words: 50
+    2:
+      label: "Standard"
+      max_words: 100
+    3:
+      label: "Détaillé"
+      max_words: 150
+
+# Sélection des fichiers de référence dans le corpus
+reference:
+  max_files: 3
+
+# OAuth2 / Azure AD
+# tenant_id et client_id sont des identifiants non secrets — renseigner directement ici.
+# client_secret est secret — valeur dans .env (générée par Ansible depuis vault.yml).
+oauth2:
+  tenant_id: "fa26da5a-124e-40ab-93e0-01e9a429557d"                  # ID du tenant Azure AD
+  client_id: "460a6d6d-6854-41a1-8d2f-3ec487b4c89d"                  # ID de l'app registration
+  redirect_uri: "https://appsec.cc/auth/callback"
+  client_secret_env: "AZURE_CLIENT_SECRET"      # nom de la variable dans .env
+  scopes:
+    - "User.Read"
+
+# Session (cookies signés)
+session:
+  secret_key_env: "SESSION_SECRET_KEY"          # nom de la variable dans .env
+  max_age: 86400                                 # durée de vie du cookie en secondes (24h)
+
+# Serveur
+server:
+  host: "127.0.0.1"
+  port: 8000
+  domain: "appsec.cc"
